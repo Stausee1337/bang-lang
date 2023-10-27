@@ -1,0 +1,69 @@
+Raii :: #import "Raii";
+
+@route("/")
+fn index(request: Request) {
+    %format()
+}
+
+fn entry() {
+    app := Raii:Application { 0 };
+    app.run(host: "0.0.0.0");
+
+    rv := can_return_3_types();
+
+    // you don't need to break in switch case
+    // but `break`ing means retrun from statement
+    response := if %type(rv) == {
+        case String:
+            break Response:from_content(rv);
+        case i32:
+            break Response {
+                content = lookup_response_for_status(rv),
+                status = rv,
+                headers = Headers { 0 }
+            };
+        case Response:
+            break rv;
+    };
+
+    network_send_packet(app.host, app.port, response);
+
+    script := catch Script:lookup(uuid) {
+        case NotFoundError:
+            send_error(websocket, WSErrors:NotFound, "UUID is not associated with a script")
+            return;
+    }
+
+    // possible but for one error, still better
+    script := catch Script:lookup(uuid) == NotFoundError {
+        send_error(websocket, WSErrors:NotFound, "UUID is not associated with a script")
+        return;
+    }
+
+    // similar syntax if you return NULL, when only one error can happen
+    if (script := Script:lookup(uuid)) == NULL {
+        send_error(websocket, WSErrors:NotFound, "UUID is not associated with a script")
+        return;
+    }
+}
+
+fn can_return_3_types() String|i32|Response {
+
+}
+
+fn this_is_just_a_failable() !void {
+    ...
+}
+
+fn this_is_a_failable_with_specific_error_or_error_set_type() SomeError!void {
+    ...
+}
+
+fn failable_with_explicit_error_set_type() error {PossibleError1,PossibleError2}!void {
+    ...
+}
+
+fn nullable() i32? {
+
+}
+

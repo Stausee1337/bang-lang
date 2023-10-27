@@ -1,0 +1,70 @@
+#open "DynamicDispatch";
+Memory :: #open "Base/Memory";
+
+struct HashSet {
+    ...
+}
+
+fn lookup(self &HashSet(TypeId, *void), $T) &$T? {
+    ...
+}
+
+fn make($T { ...$TArgs }, ...args: $TArgs) *|$T| {
+    rv := Memory:alloc(sizeof($T)) as *$T;
+    Memory:copy(rv, &$T { ...args });
+    return rv;
+}
+
+fn something($T (callable(i32) > Any)) {
+    $T(-5);
+}
+
+fn duck_type_functions(predicate: $T/pact) {
+    test := predicate.log("");
+}
+
+string :: Slice(u8);
+fn test(name Slice(u8)) { // is the same as test(name string)
+
+}
+
+//          THIS IS ALLOWED
+fn dd1(hello Dynamic) {
+    stats := hello.stats();
+    result := do_something(stats);
+    hello.update(result);
+
+    dd2(hello);
+}
+
+fn dd2(hello Dynamic) {
+    const stats Dynamic = hello.stats();
+    println(%format("{stats}"));
+}
+
+
+//          LOL
+
+struct User {
+    username string;
+    age usize;
+}
+
+fn free(self *|User|) {
+    ...
+}
+
+fn entry() {
+    set := HashSet {};
+
+    new_user := make(User, username: "Hans", age: 28);
+    defer new_user.free();
+
+
+    if user := set.lookup(User) == nil {
+        println("Could not find user", file: stderr);
+        return -1;
+    }
+
+}
+
