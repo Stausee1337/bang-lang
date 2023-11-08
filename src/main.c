@@ -4,8 +4,7 @@
 #include <string.h>
 
 #include "lexer.h"
-#include "sv.h"
-#include "sb.h"
+#include "strings.h"
 
 void print_one_token(String_Builder *sb, Lex_Token *tok) {
     sb->count = 0;

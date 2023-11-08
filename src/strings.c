@@ -1,6 +1,6 @@
 #include <assert.h>
 
-#include "sv.h"
+#include "strings.h"
 
 String_View sv_from_cstring(const char *data, size_t count) {
     String_View sv;
@@ -36,4 +36,10 @@ bool sv_startswith(String_View sv, char chr) {
     return SV_AT(&sv, 0) == chr;
 }
 
+String_View sb_to_string_view(String_Builder *sb) {
+    String_View sv;
+    sv.data = sb->items;
+    sv.count = sb->count;
+    return sv;
+}
 

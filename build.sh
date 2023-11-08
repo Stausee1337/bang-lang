@@ -1,5 +1,5 @@
 
 CFLAGS="-Wall -Wextra -ggdb"
 
-cc $CFLAGS -o bangc src/main.c src/lexer.c src/sv.c src/sb.c
+cc $CFLAGS -o out/bangc src/main.c src/lexer.c src/strings.c
 

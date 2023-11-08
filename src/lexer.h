@@ -5,8 +5,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#include "sb.h"
-#include "sv.h"
+#include "strings.h"
 
 #define lex_tok_typ(tok)    (tok)->base.type
 #define lex_tok_sv(tok)    (tok)->base.window
