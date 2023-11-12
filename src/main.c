@@ -13,7 +13,7 @@ void print_one_token(String_Builder *sb, Lex_Token *tok) {
 }
 
 int main() {
-    FILE *stream = fopen("test.txt", "r");
+    FILE *stream = fopen("stuff/test.txt", "r");
 
     fseek(stream, 0L, SEEK_END);
     size_t fsize = ftell(stream);

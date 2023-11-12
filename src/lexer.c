@@ -410,6 +410,22 @@ bool _end_parse_number(Lex_State *ls, int base, size_t number_end_pos, Lex_Numbe
     return true;
 }
 
+static
+bool _check_multiple_dots_end(Lex_State *ls) {
+    size_t remaing_count = ls->input.count - ls->input_pos;
+    if (remaing_count >= 2) {
+        // check for multi dot syntax
+        const char *string = ls->input.data + ls->input_pos;
+        int type = 0;
+        memcpy(&type, string, 3);
+        if (TOK_TO_INT(...) == (type & BIT_REMOVE(3))) {
+            return true;
+        } else if (TOK_TO_INT(..) == (type & BIT_REMOVE(2))) {
+            return true;
+        }
+    }
+    return false;
+}
 
 static
 Consume_Result consume_number_literal(Lex_State *ls) {
@@ -454,41 +470,66 @@ do {                                                         \
         curr = current(ls);                                  \
     }                                                        \
 } while (0);
-// #define FLOAT_ERROR_EXPR float_has_error |= (curr == '.')
-#define FLOAT_ERROR_EXPR (float_has_error |= (curr == '.')) && (curr == '.')
+
+
+#define MULTIPLE_DOTS_END \
+while (true) {                                                                                           \
+    ITER_DIGITS(found, false);                                                                           \
+    if (!is_eof(ls) && current(ls) == '.') {                                                             \
+        if (_check_multiple_dots_end(ls)) {                                                              \
+            FAIL_COMMON_FLOAT_ERRORS;                                                                    \
+            FAIL_BASE_UNSUPPORTED_CHR(ls, base, ls->input_pos, is_float ? FloatingPointNumber : Number); \
+            ls->token = NUMBER;                                                                          \
+            return Matched;                                                                              \
+        }                                                                                                \
+    } else {                                                                                             \
+        break;                                                                                           \
+    }                                                                                                    \
+}
+
+#define FAIL_COMMON_FLOAT_ERRORS          \
+if (base != 10 && is_float) {             \
+    FAIL(DifferentBaseFloatingLiteral);   \
+}                                         \
+if (multiple_dots_in_float) {             \
+    FAIL(MultipleDotsInFloat);            \
+}
+#define FAIL_BASE_UNSUPPORTED_CHR(...) \
+   if(!_end_parse_number(__VA_ARGS__)) { FAIL(UnsupportedDigitForBase); }
 
     int found;
     ITER_DIGITS(found, base == 16 && IS_HEX(curr));
 
     bool is_float = false;
-    bool float_has_error = false;
+    bool multiple_dots_in_float = false;
     if (!is_eof(ls) && current(ls) == '.') {
         next = lookahead(ls);
-        if (!next.is_some || !(IS_DIGIT(next.value) || next.value == '.' || next.value == 'e' || next.value == 'E')) {
+        if (!next.is_some || !(IS_DIGIT(next.value) || next.value == '.' || next.value == 'e' || next.value == 'E')){
             if (found == 0 && base == 10) {
                 // we haven't matched anything yet
                 // it's probably just the `.` token
                 return Unmatched;
             }
             bump(ls);
+            FAIL_BASE_UNSUPPORTED_CHR(ls, base, ls->input_pos, FloatingPointNumber);
+            ls->token = NUMBER;
+            return Matched;
+        }
+        if (_check_multiple_dots_end(ls)) {
+            if (found == 0 && base == 10) {
+                // we haven't matched anything yet
+                return Unmatched;
+            }
+            FAIL_BASE_UNSUPPORTED_CHR(ls, base, ls->input_pos, Number);
             ls->token = NUMBER;
             return Matched;
         }
         is_float = true;
         bump(ls);
 
-        ITER_DIGITS(found, FLOAT_ERROR_EXPR);
+        MULTIPLE_DOTS_END;
     }
 
-#define FAIL_COMMON_FLOAT_ERRORS          \
-if (base != 10 && is_float) {             \
-    FAIL(DifferentBaseFloatingLiteral);   \
-}                                         \
-if (float_has_error) {                    \
-    FAIL(MultipleDotsInFloat);            \
-}
-#define FAIL_BASE_UNSUPPORTED_CHR(...) \
-   if(!_end_parse_number(__VA_ARGS__)) { FAIL(UnsupportedDigitForBase); }
 
     if (is_eof(ls)) {
         FAIL_COMMON_FLOAT_ERRORS;
@@ -510,7 +551,7 @@ if (float_has_error) {                    \
         if (curr == '+' || curr == '-') {
             bump(ls);
         }
-        ITER_DIGITS(found, FLOAT_ERROR_EXPR);
+        MULTIPLE_DOTS_END;
     }
 
     if (is_eof(ls)) {
@@ -596,7 +637,7 @@ if (float_has_error) {                    \
     return Matched;
 
 #undef ITER_DIGITS
-#undef FLOAT_ERROR_EXPR
+#undef MULTIPLE_DOTS_END 
 #undef FAIL_COMMON_FLOAT_ERRORS
 #undef FAIL_BASE_UNSUPPORTED_CHR
 }

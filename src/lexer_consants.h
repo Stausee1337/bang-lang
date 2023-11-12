@@ -86,12 +86,14 @@ static const char* lexer_2chr_operators[] = {
     TOK_TO_STR(:=),
     TOK_TO_STR(::),
     TOK_TO_STR(->),
+    TOK_TO_STR(..),
     0
 };
 
 static const char* lexer_3chr_operators[] = {
     TOK_TO_STR(>>=),
     TOK_TO_STR(<<=),
+    TOK_TO_STR(...),
     0
 };
 
