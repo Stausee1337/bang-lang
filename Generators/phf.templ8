@@ -1,0 +1,52 @@
+{% pyimport phf_generator as hash_script %}
+
+{% macro phf_hash_map in enum name intype %}
+{% eval (top_lines, '#include <stdint.h>')|qappend %}
+
+static inline
+{{ enum.name }} {{ enum.name|snake_case|lower }}_{{ name }}({{ intype }} in) {
+    {% def STRUCT_NAME = f'_{enum.name|prefix|lower}_struct_tuple' %}
+    {% def ENTRIES_NAME = f'_{enum.name|prefix|lower}_entries' %}
+    {% def HSTATE = enum|hash_script.init %}
+    static const struct {{ STRUCT_NAME }} { uint32_t _0; {{ enum.name }} _1; } {{ ENTRIES_NAME }}[{{ enum|ilen }}] = {
+        {% for associated_value,enum_variant_name : HSTATE|hash_script.iter_entries %}
+        { {{ associated_value }}, {{ f'{enum.name|prefix|title}_{enum_variant_name}' }} },
+        {% endfor %}
+    };
+    
+    {% def N_DISPS = f'NUM_{enum.name|prefix|upper}_DISPS' %}
+#define {{ N_DISPS }} {{ HSTATE.disps|len }}
+    {% def DISPS_NAME = f'_{enum.name|prefix|lower}_disps' %}
+    static const uint32_t {{ DISPS_NAME }}[{{ N_DISPS }}][2] = 
+        { {% for disp : HSTATE.disps %}{ {{disp[0]}}, {{disp[1]}} }, {% endfor %} };
+    {% def HASHKEY_NAME = f'_{enum.name|prefix|lower}_hashkey' %}
+    static const char* {{ HASHKEY_NAME }} = {{ HSTATE|hash_script.format_key }};
+
+    {% if {intype 'char *'}== %}
+    {% eval (top_lines, '#include <string.h>')|qappend %}
+    uint64_t hash = thirdparty_siphash24(in, strlen(in), {{ HASHKEY_NAME }});
+    {% else %}
+    uint64_t hash = thirdparty_siphash24(&in, sizeof(in), {{ HASHKEY_NAME }});
+    {% endif %}
+    {% eval (top_lines, '\nuint64_t thirdparty_siphash24(const void *src, unsigned long src_sz, const char key[16]);')|qappend %}
+    const uint32_t lower = hash & 0xffffffff;
+    const uint32_t upper = (hash >> 32) & 0xffffffff;
+
+    const uint32_t g = (lower >> 16);
+    const uint32_t f1 = lower;
+    const uint32_t f2 = upper;
+
+    const uint32_t *d = {{ DISPS_NAME }}[(g % {{ N_DISPS }})];
+    const uint32_t idx = (d[1] + f1 * d[0] + f2) % {{ enum|ilen }};
+    const struct {{ STRUCT_NAME }} entry = {{ ENTRIES_NAME }}[idx];
+
+    if (entry._0 != in) {
+        return {{ enum|invaliddef }};
+    }
+    return entry._1;
+
+#undef {{ N_DISPS }}
+}
+{% endmacro %}
+
+{% export $phf_hash_map %}

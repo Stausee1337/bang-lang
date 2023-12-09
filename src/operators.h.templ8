@@ -1,0 +1,109 @@
+{% include 'phf.templ8' %}
+{% include 'enums.templ8' %}
+
+{% expand header_include_guard %}
+{% macro define_precdences in enum %}
+static unsigned char {{ enum.name|prefix|lower }}_operator_precedences[{{ enum|ilen }}] = {
+    {% for variant : enum %}{{ variant.precdence }}, {% endfor %}};
+{% endmacro %}
+
+{% pymodule _script %}
+from dataclasses import dataclass
+from Templ8.lexing import TokenStream, expect, test
+
+@dataclass
+class Variant:
+    name: str
+    token: int
+
+    def data(self):
+        return self.token
+    
+    def display(self):
+        return f'0x{self.token:08x}'
+
+@dataclass
+class PrecedenceVariant(Variant):
+    precdence: int
+
+def str_to_int(s: str, /) -> int:
+    return int.from_bytes(s.encode(), byteorder='little')
+
+def parse_token_arg(stream: TokenStream):
+    variant_token: list[str] = []
+    while not stream.is_eof():
+        if test(stream.lookahead(1), 'punct:, )'):
+            break
+        variant_token.append(expect(stream, 'punct:').value)
+    return str_to_int(''.join(variant_token))
+{% endmodule %}
+
+{% customcode (_script.PrecedenceVariant, (_script.parse_token_arg, 'int'))|enum_parser.parse as penums %}
+enum BinaryOp {
+    Plus(+, 1);
+    Minus(-, 1);
+    Mul(*, 1);
+    Div(/, 1);
+    Mod(%, 1);
+
+    BOr(||, 1);
+    BAnd(&&, 1);
+    BXor(^, 1);
+
+    Shl(<<, 1);
+    Shr(>>, 1);
+
+    Eq(==, 1);
+    Ne(!=, 1);
+
+    Gt(>, 1);
+    Ge(>=, 1);
+    Lt(<, 1);
+    Le(<=, 1);
+
+    And(&, 1);
+    Or(|, 1);
+}
+{% endcode %}
+
+{% customcode (_script.Variant, (_script.parse_token_arg,))|enum_parser.parse as tenums %}
+enum AssignmentOp {
+    Assign(=);
+
+    PlusAssign(+=);
+    MinusAssing(-=);
+    MulAssign(*=);
+    DivAssign(/=);
+    ModAssign(%=);
+
+    BOrAssign(||=);
+    BAndAssign(&&=);
+    BXorAssign(^=);
+
+    ShlAssign(<<=);
+    ShrAssign(>>=);
+
+    AndAssign(&=);
+    OrAssign(|=);
+}
+enum UnaryOp {
+    BitwiseNot(~);
+    Not(!);
+    Plus(+);
+    Minus(-);
+    Address(&);
+    Deref(*);
+}
+{% endcode %}
+
+{% for enum : penums %}
+{% expand define_enum enum %}
+{% expand define_precdences enum %}
+{% expand phf_hash_map enum 'resolve' 'uint32_t' %}
+{% endfor %}
+
+{% for enum : tenums %}
+{% expand define_enum enum %}
+{% expand phf_hash_map enum 'resolve' 'uint32_t' %}
+{% endfor %}
+

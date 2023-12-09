@@ -1,0 +1,37 @@
+
+static inline
+BinaryOp binary_op_resolve(uint32_t in) {
+    static const struct _bo_struct_tuple { uint32_t _0; BinaryOp _1; } _bo_entries[NUM_ENTRIES_BINARY_OP] = {
+        { 0x0000002b, Bo_Plus },
+        { 0x0000002a, Bo_Mul },
+        { 0x0000003e, Bo_GreatherThan },
+        { 0x0000003c, Bo_LessThan },
+        { 0x0000003d, Bo_Assign },
+        { 0x0000002d, Bo_Minus },
+        { 0x0000002f, Bo_Div },
+    };
+    
+#define NUM_BO_DISPS 2
+    static const uint32_t _bo_disps[NUM_BO_DISPS][2] = 
+        { { 4, 0 }, { 4, 6 },  };
+    static const char* _bo_hashkey = "\x00\x00\x00\x00\x00\x00\x00\x00U\xed\x95\xa2F\x11!)";
+
+    uint64_t hash = thirparty_siphash(&in, sizeof(in), _bo_hashkey);
+    const uint32_t lower = hash & 0xffffffff;
+    const uint32_t upper = (hash >> 32) & 0xffffffff;
+
+    const uint32_t g = (lower >> 16);
+    const uint32_t f1 = lower;
+    const uint32_t f2 = upper;
+
+    const uint32_t *d = _bo_disps[(g % NUM_BO_DISPS)];
+    const uint32_t idx = (d[1] + f1 * d[0] + f2) % NUM_ENTRIES_BINARY_OP;
+    const struct _bo_struct_tuple entry = _bo_entries[idx];
+
+    if (entry._0 != toktyp) {
+        return Bo_Invalid;
+    }
+    return entry._1;
+
+#undef NUM_BO_DISPS
+}
