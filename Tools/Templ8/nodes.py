@@ -65,6 +65,13 @@ class Dict(
 ):
     items: dict[Expression, Expression]
 
+class Lambda(
+    Expression,
+    printable_name='lambda'
+):
+    params: list[str]
+    expression: Expression
+
 class Literal(
     Expression,
     printable_name='literal'

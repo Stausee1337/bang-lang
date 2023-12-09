@@ -101,32 +101,32 @@ def parse_format_string(token: Token) -> n.Expression:
         start=token.start, end=token.end
     )
 
-def parse_primary(stream: TokenStream) -> n.Expression:
+def parse_primary(stream: TokenStream) -> tuple[n.Expression, bool]:
     token = stream.current
     match token.kind:
         case 'ident':  # variable
             if token.value in ('True', 'False'):
-                return n.Literal(token.value == 'True', **token)
+                return n.Literal(token.value == 'True', **token), False
             if token.value == 'None':
-                return n.Literal(None, **token)
+                return n.Literal(None, **token), False
             if token.value == 'f' and test((strl := stream.lookahead(1)), 'str:'):
                 assert strl is not None, "Unreachable"
                 next(stream)
-                return parse_format_string(strl)
+                return parse_format_string(strl), False
             if not token.value.isidentifier():
                 unexpected_error(token, 'valid python identfier')
-            return n.Variable(token.value, **token)
+            return n.Variable(token.value, **token), False
         case 'num' | 'str':
             return n.Literal(
                 int(token.value) if token.kind == 'num' else token.value[1:-1].encode().decode('unicode_escape'),
-                **token)
+                **token), False
         case 'punct':
             if token.value == '(':  # )
                 return parse_tuple(stream, explicit_parentheses=True)
             elif token.value == '{':  # }:
-                return parse_binary(stream)
+                return parse_binary(stream), False
             elif token.value == '[': # ]
-                return parse_list(stream)
+                return parse_list(stream), False
 
     unexpected_error(token, 'either string, fstring, number, boolean, variable, tuple, list or opset')
     assert False, "unreachable"
@@ -215,7 +215,9 @@ def parse_postfix(stream: TokenStream) -> n.Expression:
             return expr
         return None
 
-    expr = parse_primary(stream)
+    expr, did_parse_lambda = parse_primary(stream)
+    if did_parse_lambda:
+        return expr
     while not stream.is_eof():
         next(stream)
         if (result := inner(expr)) is None:
@@ -266,18 +268,10 @@ def parse_expr(stream: TokenStream) -> n.Expression:
         return expr
     if is_starred:
         raise WSyntaxError(stream.current, 'ternary is invalid after starred expression')
-        print(
-            stream.current.start.here(stream.filename) +
-            f' ERROR: ternary is invalid after starred expression')
-        exit(1)
     next(stream)
     true_branch = parse_expr(stream)
     if isinstance(true_branch, n.Starred):
         raise WSyntaxError((true_branch.start, stream.filename), 'starred expression is invalid within ternary')
-        print(
-            true_branch.start.here(stream.filename) +
-            f' ERROR: starred expression is invalid within ternary')
-        exit(1)
     if not test(stream.current, 'punct::'):
         unexpected_error(stream.current, 'colon')
         assert False, "Unreachable"
@@ -286,10 +280,6 @@ def parse_expr(stream: TokenStream) -> n.Expression:
     false_branch = parse_expr(stream)
     if isinstance(false_branch, n.Starred):
         raise WSyntaxError((false_branch.start, stream.filename), 'starred expression is invalid within ternary')
-        print(
-            false_branch.start.here(stream.filename) +
-            f' ERROR: starred expression is invalid within ternary')
-        exit(1)
     return n.Ternary(expr, true_branch, false_branch, start=expr.start, end=false_branch.end)
 
 def parse_tuple(stream: TokenStream, *, explicit_parentheses=False) -> n.Expression:
@@ -309,7 +299,7 @@ def parse_tuple(stream: TokenStream, *, explicit_parentheses=False) -> n.Express
             if len(tuple_expression) > 0 or explicit_parentheses:
                 tuple_expression.append(expr)
                 break
-            return expr
+            return expr if not explicit_parentheses else (expr, False)
         if explicit_parentheses and test(stream.current, 'punct:,') and test(stream.lookahead(1), 'punct:)'):
             tuple_expression.append(expr)
             next(stream)
@@ -332,7 +322,18 @@ def parse_tuple(stream: TokenStream, *, explicit_parentheses=False) -> n.Express
     if not test(stream.current, 'punct:)'):
         unexpected_error(stream.current, 'closing paren')
 
-    return expr
+    if not all(isinstance(expr, n.Variable) for expr in tuple_expression):
+        return expr if not explicit_parentheses else (expr, False)
+
+    if test(stream.lookahead(1), 'punct:-') and test(stream.lookahead(2), 'punct:>') and explicit_parentheses:
+        next(stream)
+        next(stream)
+        next(stream)
+        params = [var.name for var in tuple_expression]
+        expr = parse_expr(stream)
+        return n.Lambda(params, expr, start=starttok.start, end=expr.end), True
+
+    return expr if not explicit_parentheses else (expr, False)
 
 def is_valid_lhs(filename: str, expr: n.Expression):
     if isinstance(expr, (n.Variable, n.Attribute, n.Subscript)):
@@ -344,10 +345,6 @@ def is_valid_lhs(filename: str, expr: n.Expression):
         is_valid_lhs(filename, expr.expr)
     else:
         raise WSyntaxError((expr.start, filename), f'{expr.printable_name} is invalid LHS for assignment')
-        print(
-            expr.start.here(filename) +
-            f' ERROR: {expr.printable_name} is invalid LHS for assignment')
-        exit(1)
 
 def parse_assign_lhs(stream: TokenStream) -> n.Expression:
     lhs = parse_tuple(stream)
