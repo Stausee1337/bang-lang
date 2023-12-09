@@ -172,10 +172,16 @@ def format_key(state):
     byte_string = ikey_to_bkey(state.key)
     return format_to_string_literal(byte_string)
 
-def init(enum):
+def init_enum(enum):
     entries = [variant.data() for variant in enum]
     state = generate_hash_state(entries)
     state.__enum__ = enum
+    return state
+
+def init_set(set):
+    entries = list(set) 
+    state = generate_hash_state(entries)
+    state.__elements__ = entries
     return state
 
 def iter_entries(state):
@@ -184,6 +190,18 @@ def iter_entries(state):
     for idx in state.idx_map:
         variant = enum[idx]
         yield variant.display(), variant.name
+
+def iter_elements(state):
+    if (elements := getattr(state, '__elements__', None)) is None:
+        raise RuntimeError('HashState must have assoicated Set')
+    for idx in state.idx_map:
+        variant = elements[idx]
+        if isinstance(variant, (str, bytes)):
+            yield format_to_string_literal(variant)
+        elif isinstance(variant, (int, bool)):
+            yield str(variant).lower()
+        else:
+            raise RuntimeError('phf_set macro only supports str, bytes, int or bool elements')
 
 #          0    1   2   3  4   5  6
 entries = [12, 42, 81, 11, 3, 25, 88]
