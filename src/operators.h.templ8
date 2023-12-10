@@ -3,8 +3,16 @@
 
 {% expand header_include_guard %}
 {% macro define_precdences in enum %}
-static unsigned char {{ enum.name|prefix|lower }}_operator_precedences[{{ enum|ilen }}] = {
-    {% for variant : enum %}{{ variant.precdence }}, {% endfor %}};
+
+static inline
+unsigned char {{ enum.name|snake_case|lower }}_get_precedence({{ enum.name }} in) {
+    {% def PREC_NAME = f'{ enum.name|prefix|lower }_operator_precedences' %}
+    static const unsigned char {{ PREC_NAME }}[{{ enum|ilen }}] = {
+        {% for variant : enum %}{{ variant.precdence }}, {% endfor %}};
+
+    assert(in < {{ enum|ilen }});
+    return {{ PREC_NAME }}[in];
+}
 {% endmacro %}
 
 {% pymodule _script %}
