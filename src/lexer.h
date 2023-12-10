@@ -6,6 +6,8 @@
 #include <stdbool.h>
 
 #include "strings.h"
+#include "lexerc.generated.h"
+#include "operators.generated.h"
 
 #define lex_tok_typ(tok)    (tok)->base.type
 #define lex_tok_sv(tok)    (tok)->base.window
@@ -42,66 +44,12 @@ typedef enum {
     NumberOfTokens
 } Lex_TokenType;
 
-typedef enum {
-    i8,
-    u8,
-    i16,
-    u16,
-    i32,
-    u32,
-    i64,
-    u64,
-
-    isize,
-    usize,
-
-    f32,
-    f64,
-
-    Number,
-    FloatingPointNumber,
-    NumberOfClasses
-} Lex_NumberClass;
-
-typedef enum {
-    Dr_If,
-    Dr_Else,
-
-    Dr_Open,
-    Dr_Load,
-
-    Dr_Zero,
-
-// META:
-    Dr_Count
-} Lex_Directive;
-
-typedef enum {
-    Kw_Nil,
-    Kw_True,
-    Kw_False,
-
-    Kw_If,
-    Kw_Else,
-
-    Kw_For,
-    Kw_Loop,
-    Kw_While,
-
-    Kw_Break,
-    Kw_Continue,
-
-    Kw_Fn,
-    Kw_Enum,
-    Kw_Struct,
-    Kw_Variant,
-
-// META:
-    Kw_Count
-} Lex_Keyword;
+typedef NumberClass Lex_NumberClass;
+typedef Directive Lex_Directive;
+typedef Keyword Lex_Keyword;
 
 #define IS_FLOAT_CLASS(class) \
-    (class) == f32 || (class) == f64 || (class) == FloatingPointNumber
+    (class) == Nc_f32 || (class) == Nc_f64 || (class) == Nc_FloatingPointNumber
 
 typedef enum {
     ParserUninitialized,

@@ -6,7 +6,7 @@
 
 #include "dynarray.h"
 #include "lexer.h"
-#include "lexer_consants.h"
+#include "lexer_names.h"
 #include "strings.h"
 
 typedef struct {
@@ -270,37 +270,28 @@ Consume_Result consume_comment(Lex_State *ls) {
 
 static
 bool _match_directive(String_View sv, Lex_Directive *res) {
-    if (sv.count == 0) return false;
+    char *str = malloc(sv.count + 1);
 
-    for (const char **directive = lexer_directives; *directive != 0; directive++) {
-        if (strlen(*directive) != sv.count) {
-            continue;
-        }
-        if (memcmp(*directive, sv.data, sv.count) == 0) {
-            *res = (directive - lexer_directives);
-            return true;
-        }
-    }
+    memcpy(str, sv.data, sv.count);
+    str[sv.count] = 0;
 
-    return false;
+    *res = directive_resolve(str);
+
+    free(str);
+    return *res != D_Invalid;
 }
 
 static
 bool _match_keyword(String_View sv, Lex_Keyword *res) {
-    if (sv.count == 0) return false;
+    char *str = malloc(sv.count + 1);
 
-    int idx = 0;
-    for (const char **keyword = lexer_keywords; *keyword != 0; keyword++, idx++) {
-        if (strlen(*keyword) != sv.count) {
-            continue;
-        }
-        if (memcmp(*keyword, sv.data, sv.count) == 0) {
-            *res = idx;
-            return true;
-        }
-    }
-    
-    return false;
+    memcpy(str, sv.data, sv.count);
+    str[sv.count] = 0;
+
+    *res = keyword_resolve(str);
+
+    free(str);
+    return *res != K_Invalid;
 }
 
 static
@@ -474,18 +465,18 @@ do {                                                         \
 
 
 #define MULTIPLE_DOTS_END \
-while (true) {                                                                                           \
-    ITER_DIGITS(found, false);                                                                           \
-    if (!is_eof(ls) && current(ls) == '.') {                                                             \
-        if (_check_multiple_dots_end(ls)) {                                                              \
-            FAIL_COMMON_FLOAT_ERRORS;                                                                    \
-            FAIL_BASE_UNSUPPORTED_CHR(ls, base, ls->input_pos, is_float ? FloatingPointNumber : Number); \
-            ls->token = NUMBER;                                                                          \
-            return Matched;                                                                              \
-        }                                                                                                \
-    } else {                                                                                             \
-        break;                                                                                           \
-    }                                                                                                    \
+while (true) {                                                                                                 \
+    ITER_DIGITS(found, false);                                                                                 \
+    if (!is_eof(ls) && current(ls) == '.') {                                                                   \
+        if (_check_multiple_dots_end(ls)) {                                                                    \
+            FAIL_COMMON_FLOAT_ERRORS;                                                                          \
+            FAIL_BASE_UNSUPPORTED_CHR(ls, base, ls->input_pos, is_float ? Nc_FloatingPointNumber : Nc_Number); \
+            ls->token = NUMBER;                                                                                \
+            return Matched;                                                                                    \
+        }                                                                                                      \
+    } else {                                                                                                   \
+        break;                                                                                                 \
+    }                                                                                                          \
 }
 
 #define FAIL_COMMON_FLOAT_ERRORS          \
@@ -512,7 +503,7 @@ if (multiple_dots_in_float) {             \
                 return Unmatched;
             }
             bump(ls);
-            FAIL_BASE_UNSUPPORTED_CHR(ls, base, ls->input_pos, FloatingPointNumber);
+            FAIL_BASE_UNSUPPORTED_CHR(ls, base, ls->input_pos, Nc_FloatingPointNumber);
             ls->token = NUMBER;
             return Matched;
         }
@@ -521,7 +512,7 @@ if (multiple_dots_in_float) {             \
                 // we haven't matched anything yet
                 return Unmatched;
             }
-            FAIL_BASE_UNSUPPORTED_CHR(ls, base, ls->input_pos, Number);
+            FAIL_BASE_UNSUPPORTED_CHR(ls, base, ls->input_pos, Nc_Number);
             ls->token = NUMBER;
             return Matched;
         }
@@ -534,7 +525,7 @@ if (multiple_dots_in_float) {             \
 
     if (is_eof(ls)) {
         FAIL_COMMON_FLOAT_ERRORS;
-        FAIL_BASE_UNSUPPORTED_CHR(ls, base, ls->input_pos, is_float ? FloatingPointNumber : Number);
+        FAIL_BASE_UNSUPPORTED_CHR(ls, base, ls->input_pos, is_float ? Nc_FloatingPointNumber : Nc_Number);
         ls->token = NUMBER;
         return Matched;
     }
@@ -557,7 +548,7 @@ if (multiple_dots_in_float) {             \
 
     if (is_eof(ls)) {
         FAIL_COMMON_FLOAT_ERRORS;
-        FAIL_BASE_UNSUPPORTED_CHR(ls, base, ls->input_pos, is_float ? FloatingPointNumber : Number);
+        FAIL_BASE_UNSUPPORTED_CHR(ls, base, ls->input_pos, is_float ? Nc_FloatingPointNumber : Nc_Number);
         ls->token = NUMBER;
         return Matched;
     }
@@ -598,37 +589,37 @@ if (multiple_dots_in_float) {             \
     Lex_NumberClass class;
     if (suffix_exists == 1) {
         if (sv_eq_cstr(suffix, "i8")) {
-            class = i8; 
+            class = Nc_i8; 
         } else if (sv_eq_cstr(suffix, "u8")) {
-            class = u8;
+            class = Nc_u8;
         } else if (sv_eq_cstr(suffix, "i16")) {
-            class = i16;
+            class = Nc_i16;
         } else if (sv_eq_cstr(suffix, "u16")) {
-            class = u16;
+            class = Nc_u16;
         } else if (sv_eq_cstr(suffix, "i32")) {
-            class = i32;
+            class = Nc_i32;
         } else if (sv_eq_cstr(suffix, "u32")) {
-            class = u32;
+            class = Nc_u32;
         } else if (sv_eq_cstr(suffix, "i64")) {
-            class = i64;
+            class = Nc_i64;
         } else if (sv_eq_cstr(suffix, "u64")) {
-            class = u64;
+            class = Nc_u64;
         } else if (sv_eq_cstr(suffix, "isize")) {
-            class = isize;
+            class = Nc_isize;
         } else if (sv_eq_cstr(suffix, "usize")) {
-            class = usize;
+            class = Nc_usize;
         } else if (sv_eq_cstr(suffix, "f32")) {
-            class = f32;
+            class = Nc_f32;
         } else if (sv_eq_cstr(suffix, "f64")) {
-            class = f64;
+            class = Nc_f64;
         } else {
             assert(false && "Unreachable, we dont filter number classes correctly");
         }
     } else {
         if (is_float) {
-            class = FloatingPointNumber;
+            class = Nc_FloatingPointNumber;
         } else {
-            class = Number;
+            class = Nc_Number;
         }
     }
 
@@ -648,40 +639,33 @@ Consume_Result consume_punctuators(Lex_State *ls) {
     // get the next 4 chars as int
     size_t remaing_count = ls->input.count - ls->input_pos;
     const char *string = ls->input.data + ls->input_pos;
-    if (remaing_count > 4) {
-        remaing_count = 4;
+    if (remaing_count > 3) {
+        remaing_count = 3;
+    }
+
+    int i = remaing_count;
+    bool found = false;
+    char punct[3] = {0};
+
+    for (; i > 0; i--) {
+        memset(punct, 0, 3);
+        memcpy(punct, string, i);
+
+        if (check_is_punctuator(punct)) {
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        bump(ls);
+        FAIL(UnknownPunctuator);
     }
     int type = 0;
-    memcpy(&type, string, remaing_count);
-    // check if could be 3 char punct
-    for (const char **valid_tok = lexer_3chr_operators; *valid_tok != 0; valid_tok++) {
-        if (STR_TO_INT(*valid_tok) == (type & BIT_REMOVE(3))) {
-            bump(ls);
-            bump(ls);
-            bump(ls);
-            type &= BIT_REMOVE(3);
-            goto end;
-        }
-    }
-    // check if could be 2 char punct
-    for (const char **valid_tok = lexer_2chr_operators; *valid_tok != 0; valid_tok++) {
-        if (STR_TO_INT(*valid_tok) == (type & BIT_REMOVE(2))) {
-            bump(ls);
-            bump(ls);
-            type &= BIT_REMOVE(2);
-            goto end;
-        }
-    }
-    // check if could be 1 char punct
-    bump(ls);
-    type &= BIT_REMOVE(1);
-    goto end;
+    memcpy(&type, string, i);
 
-    bump(ls);
-    FAIL(UnknownPunctuator);
-
-end:
     ls->token = type;
+    for (int j = 0; j < i; j++)
+        bump(ls);
     return Matched;
 }
 
@@ -978,7 +962,7 @@ void lexer_print_token(String_Builder *sb, Lex_Token *token) {
         {
             Lex_TokenNumber *num = lex_tok_cast(Lex_TokenNumber, token);
             sb_append_cstr(sb, ", class = ");
-            sb_append_cstr(sb, lexer_number_classes[num->nclass]);
+            sb_append_cstr(sb, number_class_to_string(num->nclass));
             sb_append_cstr(sb, ", number = ");
             _sprintf_number(num->data, num->nclass, sb);
         } 
@@ -987,14 +971,14 @@ void lexer_print_token(String_Builder *sb, Lex_Token *token) {
         {
             Lex_TokenDirective *dir = lex_tok_cast(Lex_TokenDirective, token);
             sb_append_cstr(sb, ", directive = ");
-            sb_append_cstr(sb, lexer_directives[dir->directive]);
+            sb_append_cstr(sb, directive_to_string(dir->directive));
         }
         break;
         case KEYWORD:
         {
             Lex_TokenKeyword *key = lex_tok_cast(Lex_TokenKeyword, token);
             sb_append_cstr(sb, ", keyword = ");
-            sb_append_cstr(sb, lexer_keywords[key->keyword]);
+            sb_append_cstr(sb, keyword_to_string(key->keyword));
         }
         break;
         case ERROR: 
