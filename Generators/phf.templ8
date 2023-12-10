@@ -11,7 +11,7 @@ static inline
     {% def STRUCT_NAME = f'_{enum.name|prefix|lower}_struct_tuple' %}
     {% def ENTRIES_NAME = f'_{enum.name|prefix|lower}_entries' %}
     {% def HSTATE = enum|hash_script.init_enum %}
-    static const struct {{ STRUCT_NAME }} { uint32_t _0; {{ enum.name }} _1; } {{ ENTRIES_NAME }}[{{ enum|ilen }}] = {
+    static const struct {{ STRUCT_NAME }} { {{ intype }} _0; {{ enum.name }} _1; } {{ ENTRIES_NAME }}[{{ enum|ilen }}] = {
         {% for associated_value,enum_variant_name : HSTATE|hash_script.iter_entries %}
         { {{ associated_value }}, {{ f'{enum.name|prefix|title}_{enum_variant_name}' }} },
         {% endfor %}
