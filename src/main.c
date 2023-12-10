@@ -37,6 +37,9 @@ int main() {
         if (lex_tok_typ(&tok) == EOS)
             break;
     }
+    free(sb.items);
+
+    free(data);
 
     return 0;
 }
