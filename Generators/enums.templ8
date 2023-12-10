@@ -48,15 +48,16 @@ def parse(Variant: type, arg_parsers: tuple):
                     break
 
                 variant_name = expect(stream, 'ident:').value;
-                expect(stream, 'punct:(') #)
-
                 arguments = []
-                for i, parser in enumerate(arg_parsers):
-                    arguments.append(call_parser(parser, stream))
-                    if i != len(arg_parsers)-1:
-                        expect(stream, 'punct:,')
+                if len(arg_parsers) > 0:
+                    expect(stream, 'punct:(') #)
 
-                expect(stream, 'punct:)')
+                    for i, parser in enumerate(arg_parsers):
+                        arguments.append(call_parser(parser, stream))
+                        if i != len(arg_parsers)-1:
+                            expect(stream, 'punct:,')
+
+                    expect(stream, 'punct:)')
                 expect(stream, 'punct:;')
 
                 variants.append(Variant(variant_name, *arguments))
