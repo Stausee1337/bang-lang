@@ -39,6 +39,7 @@ typedef enum {
 #define CHR_RANGE(chr, low, hi) \
     ((chr) >= low && (chr) <= hi)
 
+// !%&()*+,-./:;<=>?[]^{|}~
 #define IS_PUNCTUATOR(chr) \
     (chr == '!' || \
     CHR_RANGE(chr, '%', '&') || \
