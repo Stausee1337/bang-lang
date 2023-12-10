@@ -68,6 +68,23 @@ def parse(Variant: type, arg_parsers: tuple):
         return enums
     return _parse
 {% endmodule %}
+{% pyimport phf_generator as _utils %}
+
+{% macro enum_to_string in enum %}
+
+static inline
+const char *{{ enum.name|snake_case|lower }}_to_string({{ enum.name }} in) {
+    {% def MAPPING_NAME = f'{ enum.name|snake_case|lower }_str_map' %}
+    static const char *{{ MAPPING_NAME }}[{{ enum|ilen }}] = {
+        {% for variant : enum %}
+        {{ variant.name|_utils.format_to_string_literal }},
+        {% endfor %}
+    };
+    assert(in < {{ enum|ilen }});
+
+    return {{ MAPPING_NAME }}[in];
+}
+{% endmacro %}
 
 {% macro define_enum in enum %}
 {% def variant_prefix = enum.name|prefix|title %}
@@ -96,4 +113,4 @@ static_assert({{ variant_prefix }}_NumberOfElements == {{ enum|ilen }}, "Number 
 {% eval (bottom_lines, f'#endif //{file_name}_')|qappend %}
 {% endmacro %}
 
-{% export $define_enum $header_include_guard enum_parser %}
+{% export $define_enum $header_include_guard $enum_to_string enum_parser %}
