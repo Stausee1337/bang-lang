@@ -410,9 +410,7 @@ bool _check_multiple_dots_end(Lex_State *ls) {
         const char *string = ls->input.data + ls->input_pos;
         int type = 0;
         memcpy(&type, string, 3);
-        if (TOK_TO_INT(...) == (type & BIT_REMOVE(3))) {
-            return true;
-        } else if (TOK_TO_INT(..) == (type & BIT_REMOVE(2))) {
+        if (type == DOUBLE_DOT) {
             return true;
         }
     }

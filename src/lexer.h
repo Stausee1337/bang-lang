@@ -18,12 +18,6 @@
 #define lex_tok_err(tok)    lex_tok_cast(Lex_TokenError, tok)->error
 #define lex_tok_is_punct(tok)  (lex_tok_typ(tok) < 0x80 || lex_tok_typ(tok) > 0xff)
 
-#define TOK_TO_STR(a) #a
-#define BIT_REMOVE(l) ((1 << ((l) * 8)) - 1)
-#define STR_TO_INT(s) ((*(int*)(s)) & BIT_REMOVE(strlen((s))))
-#define TOK_TO_INT(a) STR_TO_INT(TOK_TO_STR(a))
-
-
 typedef enum {
     ERROR = 0x80,
     EOS,
