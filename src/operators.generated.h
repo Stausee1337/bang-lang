@@ -205,7 +205,7 @@ UnaryOp unary_op_resolve(uint32_t in) {
 }
 
 static inline
-bool check_is_punctuator(char * in) {
+bool check_is_punctuator(const char * in) {
     static const char * set_elements[48] = {
         "[", "/=", "/", ";", ">>", "->", "+=", "=", "%", "|=", "<<", "*", "-=", ",", "<=", ".", "&", "<", ">", "*=", "^=", "==", "&=", "!=", ":", "|", "||", ">=", "~", ">>=", ":=", "]", "?", ")", "::", "^", "+", "<<=", "%=", "}", "&&=", "..", "&&", "||=", "-", "{", "!", "(", 
     };

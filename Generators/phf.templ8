@@ -2,6 +2,9 @@
 
 {% macro phf_hash_map in enum name intype %}
 {% eval (top_lines, '#include <stdint.h>')|qappend %}
+{% if {intype 'char *'}== %}
+{% def intype = 'const char *' %}
+{% endif %}
 
 static inline
 {{ enum.name }} {{ enum.name|snake_case|lower }}_{{ name }}({{ intype }} in) {
@@ -22,7 +25,7 @@ static inline
     {% def HASHKEY_NAME = f'_{enum.name|prefix|lower}_hashkey' %}
     static const char* {{ HASHKEY_NAME }} = {{ HSTATE|hash_script.format_key }};
 
-    {% if {intype 'char *'}== %}
+    {% if {intype 'const char *'}== %}
     {% eval (top_lines, '#include <string.h>')|qappend %}
     uint64_t hash = thirdparty_siphash24(in, strlen(in), {{ HASHKEY_NAME }});
     {% else %}
@@ -52,11 +55,14 @@ static inline
 {% macro phf_set in elements name intype %}
 {% eval (top_lines, '#include <stdint.h>')|qappend %}
 {% eval (top_lines, '#include <stdbool.h>')|qappend %}
+{% if {intype 'char *'}== %}
+{% def intype = 'const char *' %}
+{% endif %}
 
 static inline
 bool {{ name }}({{ intype }} in) {
     {% def HSTATE = elements|hash_script.init_set %}
-    static const {{ intype }} set_elements[{{ elements|len }}] = {
+    static {{ 'const'|intype.startswith ? '' : 'const' }}{{ intype }} set_elements[{{ elements|len }}] = {
         {% for entry : HSTATE|hash_script.iter_elements %}{{ entry }}, {% endfor %}
     };
 
@@ -66,7 +72,7 @@ bool {{ name }}({{ intype }} in) {
     {% def HASHKEY_NAME = f'_{ name|lower }_hashkey' %}
     static const char* {{ HASHKEY_NAME }} = {{ HSTATE|hash_script.format_key }};
 
-    {% if {intype 'char *'}== %}
+    {% if {intype 'const char *'}== %}
     {% eval (top_lines, '#include <string.h>')|qappend %}
     uint64_t hash = thirdparty_siphash24(in, strlen(in), {{ HASHKEY_NAME }});
     {% else %}
@@ -82,9 +88,9 @@ bool {{ name }}({{ intype }} in) {
 
     const uint32_t *d = displacements[(g % N_DISPS)];
     const uint32_t idx = (d[1] + f1 * d[0] + f2) % {{ elements|len }};
-    const {{ intype }} entry = set_elements[idx];
+    {{ 'const'|intype.startswith ? '' : 'const' }}{{ intype }} entry = set_elements[idx];
 
-    {% if {intype 'char *'}== %}
+    {% if {intype 'const char *'}== %}
     return strcmp(entry, in) == 0;
     {% else %}
     return entry == in;
