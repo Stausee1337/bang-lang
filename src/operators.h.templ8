@@ -23,11 +23,18 @@ class Variant:
         return f'0x{self.token:08x}'
 
 @dataclass
+class StringVariant(Variant):
+    token_str: str
+
+@dataclass
 class PrecedenceVariant(Variant):
     precdence: int
 
 def str_to_int(s: str, /) -> int:
     return int.from_bytes(s.encode(), byteorder='little')
+
+def int_to_str(i: int, /) -> str:
+    return i.to_bytes(4, byteorder='little').decode().rstrip('\x00')
 
 def parse_token_arg(stream: TokenStream):
     variant_token: list[str] = []
@@ -36,6 +43,17 @@ def parse_token_arg(stream: TokenStream):
             break
         variant_token.append(expect(stream, 'punct:').value)
     return str_to_int(''.join(variant_token))
+
+def parse_punctuators(stream: TokenStream):
+    lines = stream.buffer.splitlines()
+    variants = []
+    for line in lines:
+        if line == '' or line.isspace(): continue
+        name, token = line.split()
+        variants.append(StringVariant(name, str_to_int(token), token))
+    
+    return variants
+
 {% endmodule %}
 
 {% customcode (_script.PrecedenceVariant, (_script.parse_token_arg, 'int'))|enum_parser.parse as penums %}
@@ -97,6 +115,25 @@ enum UnaryOp {
 }
 {% endcode %}
 
+{% customcode _script.parse_punctuators as misc_punct %}
+L_BRACE         {
+R_BRACE         }
+L_BRACKET       [
+R_BRACKET       ]
+L_PAREN         (
+R_PAREN         )
+
+COLON           :
+COMMA           ,
+DOT             .
+SEMICOLON       ;
+QUESTION        ?
+
+DOUBLE_COLON    ::
+DOUBLE_DOT      ..
+ARROW           ->
+{% endcode %}
+
 {% for enum : penums %}
 {% expand define_enum enum %}
 {% expand define_precdences enum %}
@@ -108,3 +145,16 @@ enum UnaryOp {
 {% expand phf_hash_map enum 'resolve' 'uint32_t' %}
 {% endfor %}
 
+{% def all_variants = [] %}
+{% for variants : ((item) -> (item|list), [*penums, *tenums])|map %}
+{% eval variants|all_variants.extend %}
+{% endfor %}
+
+{% def all_punctuators = ((vr) -> (vr.token|_script.int_to_str), all_variants)|map|set %}
+{% eval ((item) -> item.token_str, misc_punct)|map|all_punctuators.update %}
+
+{% expand phf_set all_punctuators 'check_is_punctuator' 'char *' %}
+
+{% for punct : misc_punct %}
+#define {{ punct.name }} {{ {(punct.token_str|len) 1}== ? (punct.token_str|repr) : ()|punct.display }}
+{% endfor %}

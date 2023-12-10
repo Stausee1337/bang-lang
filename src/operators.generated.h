@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 uint64_t thirdparty_siphash24(const void *src, unsigned long src_sz, const char key[16]);
+#include <string.h>
 
 #define NUM_ENTRIES_BINARY_OP 18
 
@@ -83,11 +84,12 @@ BinaryOp binary_op_resolve(uint32_t in) {
 #undef NUM_BO_DISPS
 }
 
-#define NUM_ENTRIES_ASSIGNMENT_OP 13
+#define NUM_ENTRIES_ASSIGNMENT_OP 14
 
 typedef enum {
     Ao_Invalid = -1,
     Ao_Assign,
+    Ao_WalrusAssign,
     Ao_PlusAssign,
     Ao_MinusAssing,
     Ao_MulAssign,
@@ -108,25 +110,26 @@ static_assert(Ao_NumberOfElements == NUM_ENTRIES_ASSIGNMENT_OP, "Number of enum 
 static inline
 AssignmentOp assignment_op_resolve(uint32_t in) {
     static const struct _ao_struct_tuple { uint32_t _0; AssignmentOp _1; } _ao_entries[NUM_ENTRIES_ASSIGNMENT_OP] = {
-        { 0x00003d2f, Ao_DivAssign },
-        { 0x003d3c3c, Ao_ShlAssign },
-        { 0x00003d7c, Ao_OrAssign },
-        { 0x00003d25, Ao_ModAssign },
-        { 0x00003d2d, Ao_MinusAssing },
-        { 0x00003d2a, Ao_MulAssign },
-        { 0x00003d26, Ao_AndAssign },
-        { 0x00003d5e, Ao_BXorAssign },
-        { 0x003d7c7c, Ao_BOrAssign },
-        { 0x0000003d, Ao_Assign },
         { 0x003d3e3e, Ao_ShrAssign },
-        { 0x003d2626, Ao_BAndAssign },
         { 0x00003d2b, Ao_PlusAssign },
+        { 0x00003d2f, Ao_DivAssign },
+        { 0x00003d26, Ao_AndAssign },
+        { 0x003d3c3c, Ao_ShlAssign },
+        { 0x003d2626, Ao_BAndAssign },
+        { 0x003d7c7c, Ao_BOrAssign },
+        { 0x00003d5e, Ao_BXorAssign },
+        { 0x00003d3a, Ao_WalrusAssign },
+        { 0x00003d25, Ao_ModAssign },
+        { 0x0000003d, Ao_Assign },
+        { 0x00003d2d, Ao_MinusAssing },
+        { 0x00003d7c, Ao_OrAssign },
+        { 0x00003d2a, Ao_MulAssign },
     };
     
 #define NUM_AO_DISPS 3
     static const uint32_t _ao_disps[NUM_AO_DISPS][2] = 
-        { { 5, 7 }, { 11, 4 }, { 1, 0 },  };
-    static const char* _ao_hashkey = "\x00\x00\x00\x00\x00\x00\x00\x00\xb9\x9d\xe1\xceY\x19lN";
+        { { 1, 1 }, { 3, 0 }, { 8, 9 },  };
+    static const char* _ao_hashkey = "\x00\x00\x00\x00\x00\x00\x00\x00P\xdb\xb1\xeb\x9a\xa1K\x95";
 
     uint64_t hash = thirdparty_siphash24(&in, sizeof(in), _ao_hashkey);
     const uint32_t lower = hash & 0xffffffff;
@@ -199,5 +202,46 @@ UnaryOp unary_op_resolve(uint32_t in) {
 #undef NUM_UO_DISPS
 }
 
+static inline
+bool check_is_punctuator(char * in) {
+    static const char * set_elements[48] = {
+        "[", "/=", "/", ";", ">>", "->", "+=", "=", "%", "|=", "<<", "*", "-=", ",", "<=", ".", "&", "<", ">", "*=", "^=", "==", "&=", "!=", ":", "|", "||", ">=", "~", ">>=", ":=", "]", "?", ")", "::", "^", "+", "<<=", "%=", "}", "&&=", "..", "&&", "||=", "-", "{", "!", "(", 
+    };
+
+#define N_DISPS 10
+    static const uint32_t displacements[N_DISPS][2] = 
+        { { 0, 8 }, { 0, 41 }, { 0, 8 }, { 0, 15 }, { 1, 5 }, { 4, 7 }, { 0, 36 }, { 1, 8 }, { 33, 14 }, { 0, 0 },  };
+    static const char* _check_is_punctuator_hashkey = "\x00\x00\x00\x00\x00\x00\x00\x00\xb9\x9d\xe1\xceY\x19lN";
+
+    uint64_t hash = thirdparty_siphash24(in, strlen(in), _check_is_punctuator_hashkey);
+    const uint32_t lower = hash & 0xffffffff;
+    const uint32_t upper = (hash >> 32) & 0xffffffff;
+
+    const uint32_t g = (lower >> 16);
+    const uint32_t f1 = lower;
+    const uint32_t f2 = upper;
+
+    const uint32_t *d = displacements[(g % N_DISPS)];
+    const uint32_t idx = (d[1] + f1 * d[0] + f2) % 48;
+    const char * entry = set_elements[idx];
+
+    return strcmp(entry, in) == 0;
+#undef N_DISPS
+}
+
+#define L_BRACE '{'
+#define R_BRACE '}'
+#define L_BRACKET '['
+#define R_BRACKET ']'
+#define L_PAREN '('
+#define R_PAREN ')'
+#define COLON ':'
+#define COMMA ','
+#define DOT '.'
+#define SEMICOLON ';'
+#define QUESTION '?'
+#define DOUBLE_COLON 0x00003a3a
+#define DOUBLE_DOT 0x00002e2e
+#define ARROW 0x00003e2d
 
 #endif //OPERATORS_H_
