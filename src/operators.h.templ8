@@ -69,6 +69,7 @@ enum BinaryOp {
 {% customcode (_script.Variant, (_script.parse_token_arg,))|enum_parser.parse as tenums %}
 enum AssignmentOp {
     Assign(=);
+    WalrusAssign(:=);
 
     PlusAssign(+=);
     MinusAssing(-=);
