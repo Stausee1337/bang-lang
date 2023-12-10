@@ -70,6 +70,7 @@ def parse(Variant: type, arg_parsers: tuple):
 
 {% macro define_enum in enum %}
 {% def variant_prefix = enum.name|prefix|title %}
+{% eval (top_lines, '#include <assert.h>')|qappend %}
 
 #define {{ enum|ilen }} {{ enum|len }}
 
