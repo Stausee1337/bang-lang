@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 uint64_t thirdparty_siphash24(const void *src, unsigned long src_sz, const char key[16]);
+#include <stdbool.h>
 #include <string.h>
 
 #define NUM_ENTRIES_BINARY_OP 18
