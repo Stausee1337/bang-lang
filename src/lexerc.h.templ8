@@ -1,0 +1,71 @@
+{% include 'phf.templ8' %}
+{% include 'enums.templ8' %}
+
+{% expand header_include_guard %}
+{% pymodule _script %}
+from dataclasses import dataclass
+from phf_generator import format_to_string_literal
+
+@dataclass
+class Variant:
+    name: str
+    
+    def data(self):
+        return self.name.lower() 
+    def display(self):
+        return format_to_string_literal(self.data())
+{% endmodule %}
+
+{% customcode (_script.Variant, ())|enum_parser.parse as enums %}
+enum Keyword {
+    Nil;
+    True;
+    False;
+
+    If;
+    Else;
+
+    For;
+    Loop;
+    While;
+
+    Break;
+    Continue;
+    
+    Fn;
+    Enum;
+    Struct;
+    Variant;
+}
+
+enum Directive {
+    If;
+    Else;
+
+    Include;
+    Open;
+}
+
+enum NumberClass {
+    i8;
+    u8;
+    i16;
+    u16;
+    i32;
+    u32;
+    i64;
+    u64;
+    isize;
+    usize;
+    f32;
+    f64;
+    Number;
+    FloatingPointNumber;
+}
+{% endcode %}
+
+{% for enum : enums %}
+{% expand define_enum enum %}
+{% expand enum_to_string enum %}
+{% expand phf_hash_map enum 'resolve' 'char *' %}
+{% endfor %}
