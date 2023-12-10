@@ -43,7 +43,11 @@ static inline
     const uint32_t idx = (d[1] + f1 * d[0] + f2) % {{ enum|ilen }};
     const struct {{ STRUCT_NAME }} entry = {{ ENTRIES_NAME }}[idx];
 
+    {% if {intype 'const char *'}== %}
+    if (strcmp(entry._0, in) != 0) {
+    {% else %}
     if (entry._0 != in) {
+    {% endif %}
         return {{ enum|invaliddef }};
     }
     return entry._1;

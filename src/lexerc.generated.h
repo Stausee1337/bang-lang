@@ -90,7 +90,7 @@ Keyword keyword_resolve(const char * in) {
     const uint32_t idx = (d[1] + f1 * d[0] + f2) % NUM_ENTRIES_KEYWORD;
     const struct _k_struct_tuple entry = _k_entries[idx];
 
-    if (entry._0 != in) {
+    if (strcmp(entry._0, in) != 0) {
         return K_Invalid;
     }
     return entry._1;
@@ -150,7 +150,7 @@ Directive directive_resolve(const char * in) {
     const uint32_t idx = (d[1] + f1 * d[0] + f2) % NUM_ENTRIES_DIRECTIVE;
     const struct _d_struct_tuple entry = _d_entries[idx];
 
-    if (entry._0 != in) {
+    if (strcmp(entry._0, in) != 0) {
         return D_Invalid;
     }
     return entry._1;
@@ -240,7 +240,7 @@ NumberClass number_class_resolve(const char * in) {
     const uint32_t idx = (d[1] + f1 * d[0] + f2) % NUM_ENTRIES_NUMBER_CLASS;
     const struct _nc_struct_tuple entry = _nc_entries[idx];
 
-    if (entry._0 != in) {
+    if (strcmp(entry._0, in) != 0) {
         return Nc_Invalid;
     }
     return entry._1;
