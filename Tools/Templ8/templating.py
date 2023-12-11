@@ -125,9 +125,10 @@ class Context(dict[str, Any]):
         self.exports.update(kwargs)
 
     def __getitem__(self, key: str) -> Any:
-        if (res := dict.get(self, key)) is not None:
+        _missing = object()
+        if (res := dict.get(self, key, _missing)) is not _missing:
             return res
-        if (res := getattr(self, key, None)) is not None and is_visible(res):
+        if (res := getattr(self, key, _missing)) is not _missing and is_visible(res):
             return res
         raise KeyError(key)
 
