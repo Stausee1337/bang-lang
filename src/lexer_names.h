@@ -5,15 +5,12 @@
 
 static const char *lexer_token_names[] = {
     "EOS",
-    "Error",
-
     "Comment",
-
+    "Error",
     "Char",
     "String",
     "Note",
     "Number",
-
     "Identifier",
     "Keyword",
     "Directive"
