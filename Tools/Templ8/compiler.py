@@ -15,7 +15,7 @@ INDENT       = INDENT_CHR * INDENT_WIDTH
 
 class CodeGenerator(NodeVisitor.extend(
     n.Assign, n.Attribute, n.BinaryOp, n.Block, n.Break, n.Call, n.CallArguments,
-    n.For, n.Function, n.If, n.Lambda, n.Literal, n.List, n.Macro, n.Subscript,
+    n.For, n.Function, n.Global, n.If, n.Lambda, n.Literal, n.List, n.Macro, n.Subscript,
     n.Ternary, n.Template, n.Tuple, n.Variable, n.While, n.UnaryOp, n.Dict, n.Return, n.Starred
 )):
     def __init__(
@@ -130,6 +130,9 @@ class CodeGenerator(NodeVisitor.extend(
         self.visit_block(node.body)
         self.dedent()
         self.linebreak()
+
+    def visit_global(self, node: n.Global):
+        self.write(f'global {", ".join(node.vars)}')
 
     def visit_while(self, node: n.While):
         self.map_lineno(node.start)

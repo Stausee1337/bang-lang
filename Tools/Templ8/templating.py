@@ -467,23 +467,33 @@ def parse_expand(stream: TokenStream) -> n.Expression:
         n.CallArguments(arguments, {}, start=argstart, end=argend),
         start=starttok.start, end=stream.current.end)
 
-def parse_def(stream: TokenStream) -> n.Assign:
+def parse_def(stream: TokenStream) -> n.Node:
     assert test(stream.current, 'block_begin:'), "parse_def needs to be called with block_begin as stream.current"
     starttok = next(stream)
     assert test(stream.current, 'ident:def'), "ident needs to be def"
     next(stream)
+    store_global = False
+    if test(stream.current, 'punct:@'):
+        store_global = True
+        global_tok = expect(stream, 'ident:global')
+        next(stream)
 
     lhs = parse_assign_lhs(stream.fork_limited(eof_detect='punct:='))
     if not test(stream.current, 'punct:='):
         unexpected_error(stream.current, '=', location=lhs.end)
     next(stream)
+    if store_global and not isinstance(lhs, n.Variable):
+        raise WSyntaxError(global_tok, f'Cannot store {lhs.printable_name} as a global')
     rhs = parse_tuple(stream.fork_limited(eof_detect='block_end:'))
 
     if not test(stream.current, 'block_end:'):
         unexpected_error(stream.current, 'block_end')
     next(stream)
 
-    return n.Assign(lhs, rhs, start=starttok.start, end=stream.current.end)
+    assign = n.Assign(lhs, rhs, start=starttok.start, end=stream.current.end)
+    if store_global:
+        return n.Block([n.Global([lhs.name], **global_tok), assign], start=global_tok.start, end=stream.current.end)
+    return assign
 
 def parse_eval(stream: TokenStream) -> n.Expression:
     assert test(stream.current, 'block_begin:'), "parse_eval needs to be called with block_begin as stream.current"

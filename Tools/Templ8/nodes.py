@@ -149,6 +149,9 @@ class Function(Statement):
     args: list[str]
     body: list[Node] 
 
+class Global(Statement):
+    vars: list[str]
+
 class Macro(Statement):
     name: str
     params: list[str]

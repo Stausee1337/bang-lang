@@ -51,7 +51,7 @@ class Token(Mapping[str, Pos]):
     def __repr__(self) -> str:
         return f'{self.kind}:{self.value}'
 
-punctuation = r"""!$%&()*+,-./:;<=>?[\]^{|}~"""
+punctuation = r"""!$%&@()*+,-./:;<=>?[\]^{|}~"""
 PUNCTS = re.escape(punctuation)
 STRING = r"(?:'[^\n'\\]*(?:\\.[^\n'\\]*)*')"
 
