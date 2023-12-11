@@ -1,0 +1,10 @@
+{% def FILE_PREFIX = (('.', '_')|('.templ8'|__FILENAME__.rstrip).replace)|upper %}
+{% macro header_include_guard %}
+{% eval (top_lines, f'// this file was generated from {__FILENAME__}')|qappend %}
+{% eval (top_lines,    f'#ifndef  {FILE_PREFIX}_')|qappend %}
+{% eval (top_lines,    f'#define  {FILE_PREFIX}_')|qappend %}
+{% eval (top_lines,     '')|qappend %}
+{% eval (bottom_lines, f'#endif //{FILE_PREFIX}_')|qappend %}
+{% endmacro %}
+
+{% export $header_include_guard FILE_PREFIX %}

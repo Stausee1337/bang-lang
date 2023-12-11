@@ -1,5 +1,6 @@
 {% include 'phf.templ8' %}
 {% include 'enums.templ8' %}
+{% include 'utils.templ8' %}
 
 {% expand header_include_guard %}
 {% pymodule _script %}
