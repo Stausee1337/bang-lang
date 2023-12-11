@@ -949,6 +949,32 @@ void lexer_print_token(String_Builder *sb, Lex_Token *token) {
             sb_append_cstr(sb, keyword_to_string(key.keyword));
         }
         break;
+        case Tk_Ident:
+        {
+            Lex_TokenIdent ident = token->Tk_Ident;
+            sb_append_cstr(sb, ", ident = ");
+            da_append_many(sb, ident.name.items, ident.name.count);
+        }
+        break;
+        case Tk_Char:
+        {
+            Lex_TokenChar tchar = token->Tk_Char;
+            char buffer[4];
+            sprintf(buffer, "0x%x", tchar.wchar);
+            sb_append_cstr(sb, ", char = ");
+            sb_append_cstr(sb, buffer);
+        }
+        break;
+        case Tk_String:
+        case Tk_Note:
+        {
+            String_Builder string = kind == Tk_Note ? token->Tk_Note.note : token->Tk_String.string;
+            sb_append_cstr(sb, ", ");
+            sb_append_cstr(sb, kind == Tk_Note ? "note" : "string");
+            sb_append_cstr(sb, " = ");
+            da_append_many(sb, string.items, string.count);
+        }
+        break;
         case Tk_Error: 
         {
             Lex_TokenError err = token->Tk_Error;
