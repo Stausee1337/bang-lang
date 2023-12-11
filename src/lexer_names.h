@@ -4,8 +4,8 @@
 #include "lexer.h"
 
 static const char *lexer_token_names[] = {
-    "Error",
     "EOS",
+    "Error",
 
     "Comment",
 
@@ -19,7 +19,7 @@ static const char *lexer_token_names[] = {
     "Directive"
 };
 
-static_assert(NumberOfTokens == 0x8a, "Tokens have now changed");
+static_assert(Tk_NumberOfTokens == 0x8a, "Tokens have now changed");
 
 static const char *lexer_error_names[] = {
     "ParserUninitialized",

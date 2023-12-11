@@ -30,11 +30,10 @@ int main() {
     lexer_init(&lexer, sv_from_cstring(data, strlen(data)));
     String_Builder sb = {0};
 
-    Lex_Token tok = {0};
     for (;;) {
-        tok = lexer_lex(&lexer);
-        print_one_token(&sb, &tok);
-        if (lex_tok_typ(&tok) == EOS)
+        lexer_next(&lexer);
+        print_one_token(&sb, &lexer.token);
+        if (lexer.token.kind == Tk_EOF)
             break;
     }
     free(sb.items);
