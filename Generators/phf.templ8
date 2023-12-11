@@ -1,3 +1,4 @@
+{% include 'utils.templ8' %}
 {% pyimport phf_generator as hash_script %}
 
 {% macro phf_hash_map in enum name intype %}
@@ -5,8 +6,15 @@
 {% if {intype 'char *'}== %}
 {% def intype = 'const char *' %}
 {% endif %}
+{% def PREFIX = f'{FILE_PREFIX}_PREFIX' %}
+{% eval (top_lines, f'#ifndef  {PREFIX}')|qappend %}
+{% eval (top_lines, f'#define  {PREFIX}')|qappend %}
+{% eval (top_lines, f'#endif //{PREFIX}')|qappend %}
 
-static inline
+{{ enum.name }} {{ enum.name|snake_case|lower }}_{{ name }}({{ intype }} in);
+
+#ifdef   {{ FILE_PREFIX }}_IMPLEMENTATION
+{{ PREFIX }}
 {{ enum.name }} {{ enum.name|snake_case|lower }}_{{ name }}({{ intype }} in) {
     {% def STRUCT_NAME = f'_{enum.name|prefix|lower}_struct_tuple' %}
     {% def ENTRIES_NAME = f'_{enum.name|prefix|lower}_entries' %}
@@ -54,6 +62,7 @@ static inline
 
 #undef {{ N_DISPS }}
 }
+#endif //{{ FILE_PREFIX }}_IMPLEMENTATION
 {% endmacro %}
 
 {% macro phf_set in elements name intype %}
@@ -62,8 +71,15 @@ static inline
 {% if {intype 'char *'}== %}
 {% def intype = 'const char *' %}
 {% endif %}
+{% def PREFIX = f'{FILE_PREFIX}_PREFIX' %}
+{% eval (top_lines, f'#ifndef  {PREFIX}')|qappend %}
+{% eval (top_lines, f'#define  {PREFIX}')|qappend %}
+{% eval (top_lines, f'#endif //{PREFIX}')|qappend %}
 
-static inline
+bool {{ name }}({{ intype }} in);
+
+#ifdef   {{ FILE_PREFIX }}_IMPLEMENTATION
+{{ PREFIX }}
 bool {{ name }}({{ intype }} in) {
     {% def HSTATE = elements|hash_script.init_set %}
     static {{ 'const'|intype.startswith ? '' : 'const' }}{{ intype }} set_elements[{{ elements|len }}] = {
@@ -101,6 +117,7 @@ bool {{ name }}({{ intype }} in) {
     {% endif %}
 #undef N_DISPS
 }
+#endif //{{ FILE_PREFIX }}_IMPLEMENTATION
 {% endmacro %}
 
 {% export $phf_hash_map $phf_set %}

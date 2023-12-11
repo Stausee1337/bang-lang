@@ -4,8 +4,12 @@
 
 {% expand header_include_guard %}
 {% macro define_precdences in enum %}
+{% def PREFIX = f'{FILE_PREFIX}_PREFIX' %}
 
-static inline
+unsigned char {{ enum.name|snake_case|lower }}_get_precedence({{ enum.name }} in);
+
+#ifdef   {{ FILE_PREFIX }}_IMPLEMENTATION
+{{ PREFIX }}
 unsigned char {{ enum.name|snake_case|lower }}_get_precedence({{ enum.name }} in) {
     {% def PREC_NAME = f'{ enum.name|prefix|lower }_operator_precedences' %}
     static const unsigned char {{ PREC_NAME }}[{{ enum|ilen }}] = {
@@ -14,6 +18,7 @@ unsigned char {{ enum.name|snake_case|lower }}_get_precedence({{ enum.name }} in
     assert(in < {{ enum|ilen }});
     return {{ PREC_NAME }}[in];
 }
+#endif //{{ FILE_PREFIX }}_IMPLEMENTATION
 {% endmacro %}
 
 {% pymodule _script %}

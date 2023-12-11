@@ -1,3 +1,4 @@
+{% include 'utils.templ8' %}
 {% pymodule enum_parser %}
 from dataclasses import dataclass
 
@@ -71,8 +72,15 @@ def parse(Variant: type, arg_parsers: tuple):
 {% pyimport phf_generator as _utils %}
 
 {% macro enum_to_string in enum %}
+{% def PREFIX = f'{FILE_PREFIX}_PREFIX' %}
+{% eval (top_lines, f'#ifndef  {PREFIX}')|qappend %}
+{% eval (top_lines, f'#define  {PREFIX}')|qappend %}
+{% eval (top_lines, f'#endif //{PREFIX}')|qappend %}
 
-static inline
+const char *{{ enum.name|snake_case|lower }}_to_string({{ enum.name }} in);
+
+#ifdef   {{ FILE_PREFIX }}_IMPLEMENTATION
+{{ PREFIX }}
 const char *{{ enum.name|snake_case|lower }}_to_string({{ enum.name }} in) {
     {% def MAPPING_NAME = f'{ enum.name|snake_case|lower }_str_map' %}
     static const char *{{ MAPPING_NAME }}[{{ enum|ilen }}] = {
@@ -84,6 +92,7 @@ const char *{{ enum.name|snake_case|lower }}_to_string({{ enum.name }} in) {
 
     return {{ MAPPING_NAME }}[in];
 }
+#endif //{{ FILE_PREFIX }}_IMPLEMENTATION
 {% endmacro %}
 
 {% macro define_enum in enum %}

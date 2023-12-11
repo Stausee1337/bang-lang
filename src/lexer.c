@@ -5,6 +5,9 @@
 #include <stdlib.h>
 
 #include "dynarray.h"
+
+#define LEXERC_H_IMPLEMENTATION
+#define OPERATORS_H_IMPLEMENTATION
 #include "lexer.h"
 #include "lexer_names.h"
 #include "strings.h"
