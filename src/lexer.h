@@ -81,8 +81,8 @@ ENUMERATE_LEXER_TOKENS
     (class) == Nc_f32 || (class) == Nc_f64 || (class) == Nc_FloatingPointNumber
 
 typedef struct {
-    uint32_t col;
-    uint32_t row;
+    size_t col;
+    size_t row;
 } Lex_Pos;
 
 typedef struct {

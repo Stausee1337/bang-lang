@@ -995,13 +995,13 @@ void lexer_token_stream_free(Lex_TokenStream stream) {
 void lexer_print_pos(String_Builder *sb, Lex_Pos pos) {
     char buffer[32];
     memset(buffer, 0, sizeof(buffer));
-    sprintf(buffer, "%d", pos.row);
+    sprintf(buffer, "%zu", pos.row);
     sb_append_cstr(sb, buffer);
 
     da_append(sb, ':');
 
     memset(buffer, 0, sizeof(buffer));
-    sprintf(buffer, "%d", pos.col);
+    sprintf(buffer, "%zu", pos.col);
     sb_append_cstr(sb, buffer);
 }
 
