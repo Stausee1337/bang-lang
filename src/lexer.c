@@ -889,13 +889,13 @@ Lex_Delimiter _delimiter_from_char(char delim) {
     switch (delim) {
         case '(':
         case ')':
-            return Paren;
+            return Dl_Paren;
         case '{':
         case '}':
-            return Brace;
+            return Dl_Brace;
         case '[':
         case ']':
-            return Bracket;
+            return Dl_Bracket;
     }
     assert(false && "char is not a delimiter");
 }
@@ -1029,14 +1029,14 @@ void lexer_print_delimited(String_Builder *sb, Lex_Delimited *token) {
     sb_append_cstr(sb, "Delimited { ");
     sb_append_cstr(sb, "type = ");
     switch (token->delimiter) {
-        case Paren: 
-            sb_append_cstr(sb, "paren, ");
+        case Dl_Paren: 
+            sb_append_cstr(sb, "Paren, ");
             break;
-        case Brace: 
-            sb_append_cstr(sb, "brace, ");
+        case Dl_Brace: 
+            sb_append_cstr(sb, "Brace, ");
             break;
-        case Bracket: 
-            sb_append_cstr(sb, "bracket, ");
+        case Dl_Bracket: 
+            sb_append_cstr(sb, "Bracket, ");
             break;
     }
 

@@ -148,9 +148,9 @@ typedef struct {
 } Lex_TokenStream;
 
 typedef enum {
-    Paren = 1,
-    Brace,
-    Bracket,
+    Dl_Paren = 1,
+    Dl_Brace,
+    Dl_Bracket,
 } Lex_Delimiter;
 
 typedef struct {
