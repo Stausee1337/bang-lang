@@ -173,6 +173,9 @@ struct _TokenTree {
 };
 
 Lex_TokenStream lexer_tokenize_source(String_View filename, String_View content);
+void lexer_print_pos(String_Builder *sb, Lex_Pos pos);
+void lexer_print_span(String_Builder *sb, Lex_Span span);
 void lexer_print_token(String_Builder *sb, Lex_Token *token);
+void lexer_print_delimited(String_Builder *sb, Lex_Delimited *token);
 
 #endif // LEXER_H_

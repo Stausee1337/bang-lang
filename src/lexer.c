@@ -959,7 +959,6 @@ Lex_TokenStream lexer_tokenize_source(String_View filename, String_View content)
 }
 void lexer_print_pos(String_Builder *sb, Lex_Pos pos) {
     char buffer[32];
-    da_append(sb, '[');
     memset(buffer, 0, sizeof(buffer));
     sprintf(buffer, "%d", pos.row);
     sb_append_cstr(sb, buffer);
@@ -969,9 +968,17 @@ void lexer_print_pos(String_Builder *sb, Lex_Pos pos) {
     memset(buffer, 0, sizeof(buffer));
     sprintf(buffer, "%d", pos.col);
     sb_append_cstr(sb, buffer);
+}
+
+void lexer_print_span(String_Builder *sb, Lex_Span span) {
+    da_append(sb, '[');
+    lexer_print_pos(sb, span.start);
+    sb_append_cstr(sb, "..");
+    lexer_print_pos(sb, span.end);
     da_append(sb, ']');
 }
 
+static
 void _sprintf_number(union _64_bit_number number, Lex_NumberClass class, String_Builder *sb) {
     char buffer[100];
     memset(buffer, 0, sizeof(buffer));
@@ -981,6 +988,28 @@ void _sprintf_number(union _64_bit_number number, Lex_NumberClass class, String_
         sprintf(buffer, "%zu", number.integer);
     }
     sb_append_cstr(sb, buffer);
+}
+
+void lexer_print_delimited(String_Builder *sb, Lex_Delimited *token) {
+    sb_append_cstr(sb, "Delimited { ");
+    sb_append_cstr(sb, "type = ");
+    switch (token->delimiter) {
+        case Paren: 
+            sb_append_cstr(sb, "paren, ");
+            break;
+        case Brace: 
+            sb_append_cstr(sb, "brace, ");
+            break;
+        case Bracket: 
+            sb_append_cstr(sb, "bracket, ");
+            break;
+    }
+
+    sb_append_cstr(sb, "open = ");
+    lexer_print_span(sb, token->span.open);
+    sb_append_cstr(sb, ", close = ");
+    lexer_print_span(sb, token->span.close);
+    sb_append_cstr(sb, " }");
 }
 
 void lexer_print_token(String_Builder *sb, Lex_Token *token) { 
@@ -999,11 +1028,8 @@ void lexer_print_token(String_Builder *sb, Lex_Token *token) {
         da_append_many(sb, (char*)&kind, 4);
     }
 
-    sb_append_cstr(sb, ", start = ");
-    lexer_print_pos(sb, token->span.start);
-
-    sb_append_cstr(sb, ", end = ");
-    lexer_print_pos(sb, token->span.end);
+    sb_append_cstr(sb, ", span = ");
+    lexer_print_span(sb, token->span);
 
     switch (kind) {
         case Tk_Number: 

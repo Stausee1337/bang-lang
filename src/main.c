@@ -6,37 +6,56 @@
 #include "lexer.h"
 #include "strings.h"
 
-void print_one_token(String_Builder *sb, Lex_Token *tok) {
-    sb->count = 0;
-    lexer_print_token(sb, tok);
-    printf("Token: " SV_FMT "\n", SV_ARG(sb_to_string_view(sb)));
+void print_token_tree(String_Builder *sb, Lex_TokenTree tree) {
+    switch (tree.type) {
+        case Tt_Token:
+            lexer_print_token(sb, &tree.Tt_Token);
+            break;
+        case Tt_Delimited:
+            lexer_print_delimited(sb, &tree.Tt_Delimited);
+            break;
+    }
+    printf(SV_FMT "\n", SV_ARG(sb_to_string_view(sb)));
+}
+
+void print_token_stream(Lex_TokenStream stream, int level) {
+    String_Builder sb = {0};
+    for (size_t i = 0; i < stream.count; i++) {
+        Lex_TokenTree tree = stream.items[i];
+
+        sb.count = 0;
+        for (int j = 0; j < level; j++) {
+            sb_append_cstr(&sb, "    ");
+        }
+        print_token_tree(&sb, tree);
+
+        if (tree.type == Tt_Delimited) {
+            print_token_stream(tree.Tt_Delimited.stream, level+1);
+        }
+    }
+
+    free(sb.items);
 }
 
 int main() {
-    FILE *stream = fopen("stuff/test.txt", "r");
+    const char *filename = "stuff/test.txt";
+    FILE *file = fopen(filename, "r");
 
-    fseek(stream, 0L, SEEK_END);
-    size_t fsize = ftell(stream);
+    fseek(file, 0L, SEEK_END);
+    size_t fsize = ftell(file);
 
     char *data = malloc(fsize + 1);
     memset(data, 0, fsize + 1);
 
-    fseek(stream, 0L, SEEK_SET);
-    fread(data, 1, fsize, stream);
+    fseek(file, 0L, SEEK_SET);
+    fread(data, 1, fsize, file);
 
-    fclose(stream);
+    fclose(file);
 
-    Lex_State lexer = {0};
-    lexer_init(&lexer, sv_from_cstring(data, strlen(data)));
-    String_Builder sb = {0};
-
-    for (;;) {
-        lexer_next(&lexer);
-        print_one_token(&sb, &lexer.token);
-        if (lexer.token.kind == Tk_EOF)
-            break;
-    }
-    free(sb.items);
+    Lex_TokenStream stream = 
+        lexer_tokenize_source(sv_from_cstring(filename, strlen(filename)), sv_from_cstring(data, strlen(data)));
+    print_token_stream(stream, 0);
+    lexer_token_stream_free(stream);
 
     free(data);
 
