@@ -136,9 +136,43 @@ typedef struct {
     Lex_Token token;
 } Lex_State;
 
-void lexer_init(Lex_State *lexer, String_View sv);
-// Lex_Token lexer_lex(Lex_State *lexer);
-void lexer_next(Lex_State *lexer);
+typedef struct _TokenTree Lex_TokenTree;
+
+typedef struct {
+    Lex_TokenTree *items;
+    size_t count;
+    size_t capacity;
+} Lex_TokenStream;
+
+typedef enum {
+    Paren = 1,
+    Brace,
+    Bracket,
+} Lex_Delimiter;
+
+typedef struct {
+    Lex_Delimiter delimiter;
+    Lex_TokenStream stream;
+    struct {
+        Lex_Span open;
+        Lex_Span close;
+    } span;
+} Lex_Delimited;
+
+typedef enum {
+    Tt_Token,
+    Tt_Delimited
+} Lex_TreeType;
+
+struct _TokenTree {
+    Lex_TreeType type;
+    union {
+        Lex_Token Tt_Token;
+        Lex_Delimited Tt_Delimited;
+    };
+};
+
+Lex_TokenStream lexer_tokenize_source(String_View filename, String_View content);
 void lexer_print_token(String_Builder *sb, Lex_Token *token);
 
 #endif // LEXER_H_

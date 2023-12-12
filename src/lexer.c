@@ -806,12 +806,17 @@ Consume_Result consume_note(Lex_State *ls) {
     MATCHED(Note, .note = window_to_string(ls->window));
 }
 
-void lexer_init(Lex_State *lexer, String_View sv) {
-    lexer->input = sv;
-    lexer->file_pos.col = 1;
-    lexer->file_pos.row = 1;
+static
+Lex_State lexer_init(String_View filename, String_View input) {
+    return (Lex_State) {
+        .filename = filename,
+        .input = input,
+        .file_pos.col = 1,
+        .file_pos.row = 1
+    };
 }
 
+static
 void lexer_next(Lex_State *lexer) {
     if (lexer->input_pos == lexer->input.count) {
         goto eof;
@@ -877,6 +882,81 @@ eof:
     bump(lexer);
 }
 
+Lex_Delimiter _delimiter_from_char(char delim) {
+    switch (delim) {
+        case '(':
+        case ')':
+            return Paren;
+        case '{':
+        case '}':
+            return Brace;
+        case '[':
+        case ']':
+            return Bracket;
+    }
+    assert(false && "char is not a delimiter");
+}
+
+Lex_TokenStream _recursively_get_stream(Lex_State *lexer, Lex_Delimiter delimiter) {
+    Lex_TokenStream stream = {0};
+    while (true) {
+        if (is_eof(lexer)) {
+            goto end;
+        }
+        lexer_next(lexer);
+        Lex_Token token = lexer->token;
+        Lex_TokenTree tree = {0};
+
+        switch ((int)token.kind) {
+            case '(': 
+            case '{':
+            case '[':
+            {
+                Lex_Delimiter delim = _delimiter_from_char((char)token.kind);
+                Lex_TokenStream recursed = _recursively_get_stream(lexer, delim);
+                tree = (Lex_TokenTree) {
+                    .type = Tt_Delimited,
+                    .Tt_Delimited = (Lex_Delimited) {
+                        .delimiter = delim,
+                        .stream = recursed,
+                        .span = {
+                            .open = token.span,
+                            .close = lexer->token.span
+                        }
+                    }
+                };
+            } break;
+            case ')': 
+            case '}':
+            case ']':
+            {
+                Lex_Delimiter delim = _delimiter_from_char((char)token.kind);
+                assert(delimiter == delim && "return lexical error");
+                goto end;
+            } break;
+            case Tk_EOF:
+            {
+                assert(delimiter == 0 && "return lexical error");
+            }
+            default:
+            {
+                tree = (Lex_TokenTree) {
+                    .type = Tt_Token,
+                    .Tt_Token = token
+                };
+            } break;
+        }
+
+        da_append(&stream, tree);
+    }
+end:
+    return stream;
+}
+
+Lex_TokenStream lexer_tokenize_source(String_View filename, String_View content) {
+    Lex_State lexer = lexer_init(filename, content);
+    return _recursively_get_stream(&lexer, /* delimiter */ 0);
+}
 void lexer_print_pos(String_Builder *sb, Lex_Pos pos) {
     char buffer[32];
     da_append(sb, '[');
