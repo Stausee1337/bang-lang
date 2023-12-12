@@ -957,6 +957,38 @@ Lex_TokenStream lexer_tokenize_source(String_View filename, String_View content)
     Lex_State lexer = lexer_init(filename, content);
     return _recursively_get_stream(&lexer, /* delimiter */ 0);
 }
+
+void lexer_token_free(Lex_Token token) {
+    switch (token.kind) {
+        case Tk_String:
+        case Tk_Note:
+        {
+            String_Builder string = token.kind == Tk_Note ? token.Tk_Note.note : token.Tk_String.string;
+            free(string.items);
+        } break;
+        case Tk_Ident:
+        {
+            free(token.Tk_Ident.name.items);
+        } break;
+        default: break;
+    }
+}
+
+void lexer_token_stream_free(Lex_TokenStream stream) {
+    for (size_t i = 0; i < stream.count; i++) {
+        Lex_TokenTree tree = stream.items[i];
+        switch (tree.type) {
+            case Tt_Delimited:
+                lexer_token_stream_free(tree.Tt_Delimited.stream);
+                break;
+            case Tt_Token:
+                lexer_token_free(tree.Tt_Token);
+                break;
+        }
+    }
+    free(stream.items);
+}
+
 void lexer_print_pos(String_Builder *sb, Lex_Pos pos) {
     char buffer[32];
     memset(buffer, 0, sizeof(buffer));
