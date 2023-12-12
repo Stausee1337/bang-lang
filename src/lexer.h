@@ -39,30 +39,33 @@ typedef Keyword Lex_Keyword;
     })                              \
     VARIANT(Directive, {            \
         Lex_Directive directive;    \
-    })                              \
+    })
+
+#define ENUMERATE_LEXER_ERRORS       \
+    _E(ParserUninitialized)          \
+    _E(UnexpectedCharacter)          \
+    _E(UnclosedCharLiteral)          \
+    _E(UnclosedStringLiteral)        \
+    _E(EmptyCharLiteral)             \
+    _E(UnclosedMultilineComment)     \
+    _E(InvalidNumberSuffix)          \
+    _E(InvalidDigitForBase)          \
+    _E(MulitCharCharLiteral)         \
+    _E(UnexpectedEOF)                \
+    _E(DifferentBaseFloatingLiteral) \
+    _E(InvalidSuffixForFloat)        \
+    _E(SientificFloatWithoutExponent)\
+    _E(MultipleDotsInFloat)          \
+    _E(UnsupportedDigitForBase)      \
+    _E(UnknownPunctuator)            \
+    _E(InvalidEscape)                \
+    _E(UnknownDirective)             \
+    _E(InvalidZeroSizeNote)
 
 typedef enum {
-    ParserUninitialized,
-    UnexpectedCharacter,
-    UnclosedCharLiteral,
-    UnclosedStringLiteral,
-    EmptyCharLiteral,
-    UnclosedMultilineComment,
-    InvalidNumberSuffix,
-    InvalidDigitForBase,
-    MulitCharCharLiteral,
-    UnexpectedEOF,
-    DifferentBaseFloatingLiteral,
-    InvalidSuffixForFloat,
-    SientificFloatWithoutExponent,
-    MultipleDotsInFloat,
-    UnsupportedDigitForBase,
-    UnknownPunctuator,
-    InvalidEscape,
-    UnknownDirective,
-    InvalidZeroSizeNote,
-
-// META:
+#define _E(name) name,
+    ENUMERATE_LEXER_ERRORS
+#undef _E
     NumberOfErrors,
 } Lex_Error;
 

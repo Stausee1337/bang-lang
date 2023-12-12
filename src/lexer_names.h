@@ -1,45 +1,32 @@
-#ifndef LEXER_CONSTANTS_H_
-#define LEXER_CONSTANTS_H_
+#ifndef LEXER_NAMES_H_
+#define LEXER_NAMES_H_
 
 #include "lexer.h"
 
-static const char *lexer_token_names[] = {
-    "EOS",
-    "Comment",
-    "Error",
-    "Char",
-    "String",
-    "Note",
-    "Number",
-    "Identifier",
-    "Keyword",
-    "Directive"
-};
+inline static
+const char *lexer_tokenkind_to_string(Lex_TokenKind in) {
+    static const char *lexer_token_names[] = {
+        "EOF",
+#define VARIANT(name, ...) #name,
+        ENUMERATE_LEXER_TOKENS
+#undef VARIANT
+    };
+    assert(in < Tk_NumberOfTokens);
 
-static_assert(Tk_NumberOfTokens == 0x8a, "Tokens have now changed");
+    return lexer_token_names[in - Tk_EOF];
+}
 
-static const char *lexer_error_names[] = {
-    "ParserUninitialized",
-    "UnexpectedCharacter",
-    "UnclosedCharLiteral",
-    "UnclosedStringLiteral",
-    "EmptyCharLiteral",
-    "UnclosedMultilineComment",
-    "InvalidNumberSuffix",
-    "InvalidDigitForBase",
-    "MulitCharCharLiteral",
-    "UnexpectedEOF",
-    "DifferentBaseFloatingLiteral",
-    "InvalidSuffixForFloat",
-    "SientificFloatWithoutExponent",
-    "MultipleDotsInFloat",
-    "UnsupportedDigitForBase",
-    "UnknownPunctuator",
-    "InvalidEscape",
-    "UnknownDirective",
-    "InvalidZeroSizeNote",
-};
+inline static
+const char *lexer_error_to_string(Lex_Error in) {
+    static const char *lexer_error_names[] = {
+#define _E(name) #name,
+        ENUMERATE_LEXER_ERRORS
+#undef _E
+    };
+    assert(in < NumberOfErrors);
 
-static_assert(NumberOfErrors == 19, "Errors have now changed");
+    return lexer_error_names[in];
+}
 
-#endif // LEXER_CONSTANTS_H_ 
+
+#endif // LEXER_NAMES_H_ 

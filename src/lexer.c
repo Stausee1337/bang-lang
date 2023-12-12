@@ -1054,7 +1054,7 @@ void lexer_print_token(String_Builder *sb, Lex_Token *token) {
     if (kind < 0x80) {
         da_append(sb, (char)kind);
     } else if (kind <= 0xff) {
-        sb_append_cstr(sb, lexer_token_names[kind - 0x80]);
+        sb_append_cstr(sb, lexer_tokenkind_to_string(kind));
     } else if (kind <= 0xffff) {
         da_append_many(sb, (char*)&kind, 2);
     } else if (kind <= 0xffffff) {
@@ -1120,7 +1120,7 @@ void lexer_print_token(String_Builder *sb, Lex_Token *token) {
         {
             Lex_TokenError err = token->Tk_Error;
             sb_append_cstr(sb, ", error = ");
-            sb_append_cstr(sb, lexer_error_names[err.error]);
+            sb_append_cstr(sb, lexer_error_to_string(err.error));
         } 
         break;
         default: break;
