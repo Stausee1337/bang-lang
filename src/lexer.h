@@ -9,41 +9,37 @@
 #include "lexerc.generated.h"
 #include "operators.generated.h"
 
-#define lex_tok_typ(tok)    (tok)->base.type
-#define lex_tok_sv(tok)    (tok)->base.window
-#define lex_tok_start(tok)    (tok)->base.start
-#define lex_tok_end(tok)    (tok)->base.end
-
-#define lex_tok_cast(Typ, tok)   ((Typ*)(tok))
-#define lex_tok_err(tok)    lex_tok_cast(Lex_TokenError, tok)->error
-#define lex_tok_is_punct(tok)  (lex_tok_typ(tok) < 0x80 || lex_tok_typ(tok) > 0xff)
-
-typedef enum {
-    ERROR = 0x80,
-    EOS,
-
-    COMMENT,
-
-    // Literals
-    CHAR,
-    STRING,
-    NOTE_STR,
-    NUMBER,
-
-    IDENT,
-    KEYWORD,
-    DIRECTIVE,
-
-    // End
-    NumberOfTokens
-} Lex_TokenType;
-
 typedef NumberClass Lex_NumberClass;
 typedef Directive Lex_Directive;
 typedef Keyword Lex_Keyword;
 
-#define IS_FLOAT_CLASS(class) \
-    (class) == Nc_f32 || (class) == Nc_f64 || (class) == Nc_FloatingPointNumber
+#define ENUMERATE_LEXER_TOKENS      \
+    VARIANT(Comment)                \
+    VARIANT(Error, {                \
+        Lex_Error error;            \
+    })                              \
+    VARIANT(Char, {                 \
+        uint32_t wchar;             \
+    })                              \
+    VARIANT(String, {               \
+        String_Builder string;      \
+    })                              \
+    VARIANT(Note, {                 \
+        String_Builder note;        \
+    })                              \
+    VARIANT(Number, {               \
+        union _64_bit_number number;\
+        Lex_NumberClass nclass;     \
+    })                              \
+    VARIANT(Ident, {                \
+        String_Builder name;        \
+    })                              \
+    VARIANT(Keyword, {              \
+        Lex_Keyword keyword;        \
+    })                              \
+    VARIANT(Directive, {            \
+        Lex_Directive directive;    \
+    })                              \
 
 typedef enum {
     ParserUninitialized,
@@ -70,17 +66,60 @@ typedef enum {
     NumberOfErrors,
 } Lex_Error;
 
+typedef enum {
+#define VARIANT(name, ...) Tk_##name,
+    Tk_EOF = 0x80,
+ENUMERATE_LEXER_TOKENS
+    Tk_NumberOfTokens
+#undef VARIANT
+} Lex_TokenKind;
+
+#define IS_FLOAT_CLASS(class) \
+    (class) == Nc_f32 || (class) == Nc_f64 || (class) == Nc_FloatingPointNumber
 
 typedef struct {
     uint32_t col;
     uint32_t row;
 } Lex_Pos;
 
+typedef struct {
+    String_View filename;
+    Lex_Pos start;
+    Lex_Pos end;
+} Lex_Span;
+
 union _64_bit_number {
     uint64_t integer;
     double floating;
 };
+
+#define VARIANT(...) VARIANT_REAL(__VA_ARGS__, 2, 1)
+#define VARIANT_REAL(name, body, count, ...) VARIANT_##count(name, body)
+
+#define VARIANT_1(name, ...)
+#define VARIANT_2(name, body) \
+    typedef struct body Lex_Token##name;
+
+ENUMERATE_LEXER_TOKENS
+
+#undef VARIANT_2
+
 typedef struct {
+    Lex_Span span;
+    Lex_TokenKind kind;
+    union {
+#define VARIANT_2(name, body) Lex_Token##name Tk_##name;
+        ENUMERATE_LEXER_TOKENS
+    };
+} Lex_Token;
+
+#undef VARIANT_2
+#undef VARIANT_1
+#undef VARIANT_REAL
+#undef VARIANT
+
+typedef struct {
+    String_View filename;
     String_View input;
 
     size_t input_pos;
@@ -92,53 +131,55 @@ typedef struct {
     Lex_Pos token_start_pos;
     Lex_Pos token_end_pos;
 
-    Lex_TokenType token;
     String_View window;
 
-    Lex_Error error;
-    char char_literal;
-    union _64_bit_number number;
-    Lex_NumberClass number_class;
-    Lex_Directive directive;
-    Lex_Keyword keyword;
+    Lex_Token token;
 } Lex_State;
 
-typedef struct {
-    Lex_TokenType type;
-    String_View window;
-    Lex_Pos start;
-    Lex_Pos end;
-} Lex_TokenBase;
+typedef struct _TokenTree Lex_TokenTree;
 
 typedef struct {
-    Lex_TokenBase base;
-    Lex_Error error;
-} Lex_TokenError;
+    Lex_TokenTree *items;
+    size_t count;
+    size_t capacity;
+} Lex_TokenStream;
+
+typedef enum {
+    Paren = 1,
+    Brace,
+    Bracket,
+} Lex_Delimiter;
 
 typedef struct {
-    Lex_TokenBase base;
-    union _64_bit_number data;
-    Lex_NumberClass nclass;
-} Lex_TokenNumber;
+    Lex_Delimiter delimiter;
+    Lex_TokenStream stream;
+    struct {
+        Lex_Span open;
+        Lex_Span close;
+    } span;
+} Lex_Delimited;
 
-typedef struct {
-    Lex_TokenBase base;
-    Lex_Directive directive;
-} Lex_TokenDirective;
+typedef enum {
+    Tt_Token,
+    Tt_Delimited
+} Lex_TreeType;
 
-typedef struct {
-    Lex_TokenBase base;
-    Lex_Keyword keyword;
-} Lex_TokenKeyword;
+struct _TokenTree {
+    Lex_TreeType type;
+    union {
+        Lex_Token Tt_Token;
+        Lex_Delimited Tt_Delimited;
+    };
+};
 
-typedef struct {
-    Lex_TokenBase base;
-    char _offset[64 - sizeof(Lex_TokenBase)];
-} Lex_Token;
+Lex_TokenStream lexer_tokenize_source(String_View filename, String_View content);
 
+void lexer_token_free(Lex_Token token);
+void lexer_token_stream_free(Lex_TokenStream stream);
 
-void lexer_init(Lex_State *lexer, String_View sv);
-Lex_Token lexer_lex(Lex_State *lexer);
+void lexer_print_pos(String_Builder *sb, Lex_Pos pos);
+void lexer_print_span(String_Builder *sb, Lex_Span span);
 void lexer_print_token(String_Builder *sb, Lex_Token *token);
+void lexer_print_delimited(String_Builder *sb, Lex_Delimited *token);
 
 #endif // LEXER_H_

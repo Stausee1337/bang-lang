@@ -54,12 +54,36 @@ typedef enum {
     CHR_RANGE(chr, '{', '~'))
  
 #define CONTINUE_UNMATCHED(expr) \
-    if (expr < Unmatched) { goto defer; }\
+    if ((expr) < Unmatched) { return; }\
     restore(lexer);
 
+#define TK_SPAN() finish(ls)
+
+#define MATCHED1(name) \
+    ls->token = (Lex_Token) {   \
+        .kind = Tk_##name,     \
+        .span = TK_SPAN(),      \
+    };                          \
+    return Matched;
+
+#define MATCHED(name, ...) \
+    ls->token = (Lex_Token) {           \
+        .kind = Tk_##name,              \
+        .span = TK_SPAN(),              \
+        .Tk_##name = (Lex_Token##name) {\
+            __VA_ARGS__                 \
+        }                               \
+    };                                  \
+    return Matched;
+
 #define FAIL(x_error) \
-    ls->token = ERROR; \
-    ls->error = (x_error); \
+    ls->token = (Lex_Token) {          \
+        .kind = Tk_Error,              \
+        .span = TK_SPAN(),             \
+        .Tk_Error = (Lex_TokenError) { \
+            .error = x_error           \
+        }                              \
+    };                                 \
     return Error;
 
 typedef struct {
@@ -95,7 +119,7 @@ int is_newline(Lex_State *ls) {
 
 static
 bool is_eof(Lex_State *ls) {
-    return ls->token == EOS;
+    return ls->token.kind == Tk_EOF;
 }
 
 static
@@ -113,7 +137,10 @@ void bump(Lex_State *ls) {
     }
 
     if (ls->input_pos == ls->input.count) {
-        ls->token = EOS;
+        ls->token = (Lex_Token) {
+            .kind = Tk_EOF,
+            .span = {{0}}
+        };
     }
 }
 
@@ -151,70 +178,16 @@ void create_window(Lex_State *ls) {
 }
 
 static
-void finish(Lex_State *ls) {
+Lex_Span finish(Lex_State *ls) {
     ls->token_end_pos = ls->file_pos;
     ls->token_end = ls->input_pos;
     create_window(ls);
-}
 
-static
-Lex_Token token_for_type(Lex_State *ls) {
-#define BASE_TOKEN                  \
-(Lex_TokenBase){                    \
-    .type = ls->token,              \
-    .window = ls->window,           \
-    .start = ls->token_start_pos,   \
-    .end = ls->token_end_pos        \
-};
-#define RETURN(val) return *(Lex_Token*)&val;
-
-    switch (ls->token) {
-        case NUMBER:
-        {
-            Lex_TokenBase bt = BASE_TOKEN;
-            Lex_TokenNumber et = {
-                .base = bt,
-                .data = ls->number,
-                .nclass = ls->number_class
-            };
-            RETURN(et);
-        }
-        case DIRECTIVE:
-        {
-            Lex_TokenBase bt = BASE_TOKEN;
-            Lex_TokenDirective dt = {
-                .base = bt,
-                .directive = ls->directive
-            };
-            RETURN(dt);
-        }
-        case KEYWORD:
-        {
-            Lex_TokenBase bt = BASE_TOKEN;
-            Lex_TokenKeyword kt = {
-                .base = bt,
-                .keyword = ls->keyword
-            };
-            RETURN(kt);
-        }
-        case ERROR:
-        {
-            Lex_TokenBase bt = BASE_TOKEN;
-            Lex_TokenError et = {
-                .base = bt,
-                .error = ls->error
-            };
-            RETURN(et);
-        }
-        default:
-        {
-            Lex_TokenBase tt = BASE_TOKEN;
-            RETURN(tt);
-        }
-    }
-
-#undef RETURN
-#undef BASE_TOKEN
+    return (Lex_Span) {
+        .filename = ls->filename,
+        .start = ls->token_start_pos,
+        .end = ls->token_end_pos
+    };
 }
 
 static
@@ -226,8 +199,7 @@ Consume_Result consume_singleline_comment(Lex_State *ls) {
         }
     }
     bump(ls);
-    ls->token = COMMENT;
-    return Matched;
+    MATCHED1(Comment);
 }
 
 static
@@ -250,8 +222,7 @@ Consume_Result consume_multiline_comment(Lex_State *ls) {
     }
 end:
     bump(ls);
-    ls->token = COMMENT;
-    return Matched;
+    MATCHED1(Comment);
 }
 
 static
@@ -298,6 +269,18 @@ bool _match_keyword(String_View sv, Lex_Keyword *res) {
 }
 
 static
+String_Builder window_to_string(String_View window) {
+    char *str = malloc(window.count);
+    memcpy(str, window.data, window.count);
+
+    return (String_Builder) {
+        .items = str,
+        .count = window.count,
+        .capacity = window.count
+    };
+}
+
+static
 Consume_Result consume_identifier(Lex_State *ls, bool simple) {
     char curr = current(ls);
     if (curr == '#') {
@@ -321,24 +304,19 @@ Consume_Result consume_identifier(Lex_State *ls, bool simple) {
             // check directive
             Lex_Directive d;
             if (_match_directive(sv_slice(identifier, 1, identifier.count), &d)) {
-                ls->directive = d; 
-                ls->token = DIRECTIVE;
-                return Matched;
+                MATCHED(Directive, .directive = d)
             }
             FAIL(UnknownDirective);
         } else if (!sv_startswith(identifier, '$')) {
             // check keyword
             Lex_Keyword k;
             if (_match_keyword(identifier, &k)) {
-                ls->keyword = k; 
-                ls->token = KEYWORD;
-                return Matched;
+                MATCHED(Keyword, .keyword = k)
             }
         }
     }
 end:
-    ls->token = IDENT;
-    return Matched;
+    MATCHED(Ident, .name = window_to_string(ls->window))
 }
 
 static
@@ -366,8 +344,6 @@ bool _is_float_suffix(String_View sv) {
 
 static
 bool _end_parse_number(Lex_State *ls, int base, size_t number_end_pos, Lex_NumberClass class) {
-    ls->number_class = class;
-
     create_window(ls);
     int start = 0;
     if (base != 10) {
@@ -394,12 +370,21 @@ bool _end_parse_number(Lex_State *ls, int base, size_t number_end_pos, Lex_Numbe
     memcpy(number_str, number_sv.data, number_sv.count);
 
     char *endptr;
+    union _64_bit_number number;
     if (IS_FLOAT_CLASS(class)) {
-        ls->number.floating = strtod(number_str, &endptr);
+        number.floating = strtod(number_str, &endptr);
     } else {
-        ls->number.integer = strtol(number_str, &endptr, base);
+        number.integer = strtol(number_str, &endptr, base);
     }
 
+    ls->token = (Lex_Token) {
+        .kind = Tk_Number,
+        .span = TK_SPAN(),
+        .Tk_Number = (Lex_TokenNumber) {
+            .number = number,
+            .nclass = class
+        }
+    };
 
     free(number_str);
     return true;
@@ -472,7 +457,6 @@ while (true) {                                                                  
         if (_check_multiple_dots_end(ls)) {                                                                    \
             FAIL_COMMON_FLOAT_ERRORS;                                                                          \
             FAIL_BASE_UNSUPPORTED_CHR(ls, base, ls->input_pos, is_float ? Nc_FloatingPointNumber : Nc_Number); \
-            ls->token = NUMBER;                                                                                \
             return Matched;                                                                                    \
         }                                                                                                      \
     } else {                                                                                                   \
@@ -505,7 +489,6 @@ if (multiple_dots_in_float) {             \
             }
             bump(ls);
             FAIL_BASE_UNSUPPORTED_CHR(ls, base, ls->input_pos, Nc_FloatingPointNumber);
-            ls->token = NUMBER;
             return Matched;
         }
         if (_check_multiple_dots_end(ls)) {
@@ -514,7 +497,6 @@ if (multiple_dots_in_float) {             \
                 return Unmatched;
             }
             FAIL_BASE_UNSUPPORTED_CHR(ls, base, ls->input_pos, Nc_Number);
-            ls->token = NUMBER;
             return Matched;
         }
         is_float = true;
@@ -527,7 +509,6 @@ if (multiple_dots_in_float) {             \
     if (is_eof(ls)) {
         FAIL_COMMON_FLOAT_ERRORS;
         FAIL_BASE_UNSUPPORTED_CHR(ls, base, ls->input_pos, is_float ? Nc_FloatingPointNumber : Nc_Number);
-        ls->token = NUMBER;
         return Matched;
     }
 
@@ -550,7 +531,6 @@ if (multiple_dots_in_float) {             \
     if (is_eof(ls)) {
         FAIL_COMMON_FLOAT_ERRORS;
         FAIL_BASE_UNSUPPORTED_CHR(ls, base, ls->input_pos, is_float ? Nc_FloatingPointNumber : Nc_Number);
-        ls->token = NUMBER;
         return Matched;
     }
 
@@ -583,7 +563,6 @@ if (multiple_dots_in_float) {             \
     }
 
     if (is_float && suffix_exists == 1 && !has_float_suffix) {
-        printf("Suffix: " SV_FMT "\n", SV_ARG(suffix));
         FAIL(InvalidSuffixForFloat);
     }
 
@@ -625,8 +604,6 @@ if (multiple_dots_in_float) {             \
     }
 
     FAIL_BASE_UNSUPPORTED_CHR(ls, base, number_end_pos, class);
-
-    ls->token = NUMBER;
     return Matched;
 
 #undef ITER_DIGITS
@@ -661,12 +638,15 @@ Consume_Result consume_punctuators(Lex_State *ls) {
         bump(ls);
         FAIL(UnknownPunctuator);
     }
-    int type = 0;
-    memcpy(&type, string, i);
+    int kind = 0;
+    memcpy(&kind, string, i);
 
-    ls->token = type;
     for (int j = 0; j < i; j++)
         bump(ls);
+    ls->token = (Lex_Token) {
+        .kind = kind,
+        .span = TK_SPAN()
+    };
     return Matched;
 }
 
@@ -738,9 +718,7 @@ Consume_Result consume_char_literal(Lex_State *ls) {
         if (invalid_escape) {
             FAIL(InvalidEscape);
         }
-        ls->token = CHAR;
-        ls->char_literal = c;
-        return Matched;
+        MATCHED(Char, .wchar = c);
     }
 
     while (!is_newline(ls)) {
@@ -807,8 +785,7 @@ Consume_Result consume_string_literal(Lex_State *ls) {
         FAIL(InvalidEscape);
     }
 
-    ls->token = STRING;
-    return Matched;
+    MATCHED(String, .string = window_to_string(ls->window));
 }
 
 static
@@ -829,19 +806,22 @@ Consume_Result consume_note(Lex_State *ls) {
         FAIL(InvalidZeroSizeNote);
     }
 
-    ls->token = NOTE_STR;
-    return Matched;
+    MATCHED(Note, .note = window_to_string(ls->window));
 }
 
-void lexer_init(Lex_State *lexer, String_View sv) {
-    lexer->input = sv;
-    lexer->file_pos.col = 1;
-    lexer->file_pos.row = 1;
+static
+Lex_State lexer_init(String_View filename, String_View input) {
+    return (Lex_State) {
+        .filename = filename,
+        .input = input,
+        .file_pos.col = 1,
+        .file_pos.row = 1
+    };
 }
 
-Lex_Token lexer_lex(Lex_State *lexer) {
+static
+void lexer_next(Lex_State *lexer) {
     if (lexer->input_pos == lexer->input.count) {
-        lexer->token = EOS; 
         goto eof;
     }
     while (true) {
@@ -857,8 +837,11 @@ Lex_Token lexer_lex(Lex_State *lexer) {
 eof:
         lexer->token_start = lexer->input_pos;
         lexer->token_start_pos = lexer->file_pos;
-        finish(lexer);
-        return token_for_type(lexer);
+        lexer->token = (Lex_Token) {
+            .kind = Tk_EOF,
+            .span = finish(lexer)
+        };
+        return;
     }
     save(lexer);
 
@@ -892,19 +875,125 @@ eof:
     }
 
 
-    lexer->token = ERROR;
-    lexer->error = UnexpectedCharacter;
+    lexer->token = (Lex_Token) {
+        .kind = Tk_Error,
+        .span = finish(lexer),
+        .Tk_Error = (Lex_TokenError) {
+            .error = UnexpectedCharacter 
+        }
+    };
     bump(lexer);
-defer:
-{
-    finish(lexer);
-    return token_for_type(lexer);
 }
+
+Lex_Delimiter _delimiter_from_char(char delim) {
+    switch (delim) {
+        case '(':
+        case ')':
+            return Paren;
+        case '{':
+        case '}':
+            return Brace;
+        case '[':
+        case ']':
+            return Bracket;
+    }
+    assert(false && "char is not a delimiter");
+}
+
+Lex_TokenStream _recursively_get_stream(Lex_State *lexer, Lex_Delimiter delimiter) {
+    Lex_TokenStream stream = {0};
+    while (true) {
+        if (is_eof(lexer)) {
+            goto end;
+        }
+        lexer_next(lexer);
+        Lex_Token token = lexer->token;
+        Lex_TokenTree tree = {0};
+
+        switch ((int)token.kind) {
+            case '(': 
+            case '{':
+            case '[':
+            {
+                Lex_Delimiter delim = _delimiter_from_char((char)token.kind);
+                Lex_TokenStream recursed = _recursively_get_stream(lexer, delim);
+                tree = (Lex_TokenTree) {
+                    .type = Tt_Delimited,
+                    .Tt_Delimited = (Lex_Delimited) {
+                        .delimiter = delim,
+                        .stream = recursed,
+                        .span = {
+                            .open = token.span,
+                            .close = lexer->token.span
+                        }
+                    }
+                };
+            } break;
+            case ')': 
+            case '}':
+            case ']':
+            {
+                Lex_Delimiter delim = _delimiter_from_char((char)token.kind);
+                assert(delimiter == delim && "return lexical error");
+                goto end;
+            } break;
+            case Tk_EOF:
+            {
+                assert(delimiter == 0 && "return lexical error");
+            }
+            default:
+            {
+                tree = (Lex_TokenTree) {
+                    .type = Tt_Token,
+                    .Tt_Token = token
+                };
+            } break;
+        }
+
+        da_append(&stream, tree);
+    }
+end:
+    return stream;
+}
+
+Lex_TokenStream lexer_tokenize_source(String_View filename, String_View content) {
+    Lex_State lexer = lexer_init(filename, content);
+    return _recursively_get_stream(&lexer, /* delimiter */ 0);
+}
+
+void lexer_token_free(Lex_Token token) {
+    switch (token.kind) {
+        case Tk_String:
+        case Tk_Note:
+        {
+            String_Builder string = token.kind == Tk_Note ? token.Tk_Note.note : token.Tk_String.string;
+            free(string.items);
+        } break;
+        case Tk_Ident:
+        {
+            free(token.Tk_Ident.name.items);
+        } break;
+        default: break;
+    }
+}
+
+void lexer_token_stream_free(Lex_TokenStream stream) {
+    for (size_t i = 0; i < stream.count; i++) {
+        Lex_TokenTree tree = stream.items[i];
+        switch (tree.type) {
+            case Tt_Delimited:
+                lexer_token_stream_free(tree.Tt_Delimited.stream);
+                break;
+            case Tt_Token:
+                lexer_token_free(tree.Tt_Token);
+                break;
+        }
+    }
+    free(stream.items);
 }
 
 void lexer_print_pos(String_Builder *sb, Lex_Pos pos) {
     char buffer[32];
-    da_append(sb, '[');
     memset(buffer, 0, sizeof(buffer));
     sprintf(buffer, "%d", pos.row);
     sb_append_cstr(sb, buffer);
@@ -914,9 +1003,17 @@ void lexer_print_pos(String_Builder *sb, Lex_Pos pos) {
     memset(buffer, 0, sizeof(buffer));
     sprintf(buffer, "%d", pos.col);
     sb_append_cstr(sb, buffer);
+}
+
+void lexer_print_span(String_Builder *sb, Lex_Span span) {
+    da_append(sb, '[');
+    lexer_print_pos(sb, span.start);
+    sb_append_cstr(sb, "..");
+    lexer_print_pos(sb, span.end);
     da_append(sb, ']');
 }
 
+static
 void _sprintf_number(union _64_bit_number number, Lex_NumberClass class, String_Builder *sb) {
     char buffer[100];
     memset(buffer, 0, sizeof(buffer));
@@ -928,75 +1025,105 @@ void _sprintf_number(union _64_bit_number number, Lex_NumberClass class, String_
     sb_append_cstr(sb, buffer);
 }
 
-void lexer_print_token(String_Builder *sb, Lex_Token *token) {
- 
-    sb_append_cstr(sb, "Token { ");
-    // .type
+void lexer_print_delimited(String_Builder *sb, Lex_Delimited *token) {
+    sb_append_cstr(sb, "Delimited { ");
     sb_append_cstr(sb, "type = ");
-    Lex_TokenType typ = lex_tok_typ(token);
-    if (typ < 0x80) {
-        da_append(sb, (char)typ);
-    } else if (typ <= 0xff) {
-        sb_append_cstr(sb, lexer_token_names[typ - 0x80]);
-    } else if (typ <= 0xffff) {
-        da_append_many(sb, (char*)&typ, 2);
-    } else if (typ <= 0xffffff) {
-        da_append_many(sb, (char*)&typ, 3);
-    } else if (typ <= 0xffffffff) {
-        da_append_many(sb, (char*)&typ, 4);
+    switch (token->delimiter) {
+        case Paren: 
+            sb_append_cstr(sb, "paren, ");
+            break;
+        case Brace: 
+            sb_append_cstr(sb, "brace, ");
+            break;
+        case Bracket: 
+            sb_append_cstr(sb, "bracket, ");
+            break;
     }
 
-    // .length
-    /*sb_append_cstr(sb, ", length = ");
-    memset(buffer, 0, sizeof(buffer));
-    sprintf(buffer, "%zu", lex_tok_sv(token).count);
-    sb_append_cstr(sb, buffer);*/
+    sb_append_cstr(sb, "open = ");
+    lexer_print_span(sb, token->span.open);
+    sb_append_cstr(sb, ", close = ");
+    lexer_print_span(sb, token->span.close);
+    sb_append_cstr(sb, " }");
+}
 
-    sb_append_cstr(sb, ", start = ");
-    lexer_print_pos(sb, lex_tok_start(token));
+void lexer_print_token(String_Builder *sb, Lex_Token *token) { 
+    sb_append_cstr(sb, "Token { ");
+    sb_append_cstr(sb, "type = ");
+    Lex_TokenKind kind = token->kind;
+    if (kind < 0x80) {
+        da_append(sb, (char)kind);
+    } else if (kind <= 0xff) {
+        sb_append_cstr(sb, lexer_token_names[kind - 0x80]);
+    } else if (kind <= 0xffff) {
+        da_append_many(sb, (char*)&kind, 2);
+    } else if (kind <= 0xffffff) {
+        da_append_many(sb, (char*)&kind, 3);
+    } else if (kind <= 0xffffffff) {
+        da_append_many(sb, (char*)&kind, 4);
+    }
 
-    sb_append_cstr(sb, ", end = ");
-    lexer_print_pos(sb, lex_tok_end(token));
+    sb_append_cstr(sb, ", span = ");
+    lexer_print_span(sb, token->span);
 
-    switch (lex_tok_typ(token)) {
-        case NUMBER: 
+    switch (kind) {
+        case Tk_Number: 
         {
-            Lex_TokenNumber *num = lex_tok_cast(Lex_TokenNumber, token);
+            Lex_TokenNumber num = token->Tk_Number;
             sb_append_cstr(sb, ", class = ");
-            sb_append_cstr(sb, number_class_to_string(num->nclass));
+            sb_append_cstr(sb, number_class_to_string(num.nclass));
             sb_append_cstr(sb, ", number = ");
-            _sprintf_number(num->data, num->nclass, sb);
+            _sprintf_number(num.number, num.nclass, sb);
         } 
         break;
-        case DIRECTIVE:
+        case Tk_Directive:
         {
-            Lex_TokenDirective *dir = lex_tok_cast(Lex_TokenDirective, token);
+            Lex_TokenDirective dir = token->Tk_Directive;
             sb_append_cstr(sb, ", directive = ");
-            sb_append_cstr(sb, directive_to_string(dir->directive));
+            sb_append_cstr(sb, directive_to_string(dir.directive));
         }
         break;
-        case KEYWORD:
+        case Tk_Keyword:
         {
-            Lex_TokenKeyword *key = lex_tok_cast(Lex_TokenKeyword, token);
+            Lex_TokenKeyword key = token->Tk_Keyword;
             sb_append_cstr(sb, ", keyword = ");
-            sb_append_cstr(sb, keyword_to_string(key->keyword));
+            sb_append_cstr(sb, keyword_to_string(key.keyword));
         }
         break;
-        case ERROR: 
+        case Tk_Ident:
         {
+            Lex_TokenIdent ident = token->Tk_Ident;
+            sb_append_cstr(sb, ", ident = ");
+            da_append_many(sb, ident.name.items, ident.name.count);
+        }
+        break;
+        case Tk_Char:
+        {
+            Lex_TokenChar tchar = token->Tk_Char;
+            char buffer[4];
+            sprintf(buffer, "0x%x", tchar.wchar);
+            sb_append_cstr(sb, ", char = ");
+            sb_append_cstr(sb, buffer);
+        }
+        break;
+        case Tk_String:
+        case Tk_Note:
+        {
+            String_Builder string = kind == Tk_Note ? token->Tk_Note.note : token->Tk_String.string;
+            sb_append_cstr(sb, ", ");
+            sb_append_cstr(sb, kind == Tk_Note ? "note" : "string");
+            sb_append_cstr(sb, " = ");
+            da_append_many(sb, string.items, string.count);
+        }
+        break;
+        case Tk_Error: 
+        {
+            Lex_TokenError err = token->Tk_Error;
             sb_append_cstr(sb, ", error = ");
-            sb_append_cstr(sb, lexer_error_names[lex_tok_err(token)]);
+            sb_append_cstr(sb, lexer_error_names[err.error]);
         } 
         break;
-        default:
-        {
-            if (!lex_tok_is_punct(token)) {            
-                sb_append_cstr(sb, ", slice = '");
-                da_append_many(sb, lex_tok_sv(token).data, lex_tok_sv(token).count);
-                da_append(sb, '\'');
-            }
-        }
-        break;
+        default: break;
     }
 
     sb_append_cstr(sb, " }");
