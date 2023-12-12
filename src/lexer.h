@@ -60,7 +60,10 @@ typedef Keyword Lex_Keyword;
     _E(UnknownPunctuator)            \
     _E(InvalidEscape)                \
     _E(UnknownDirective)             \
-    _E(InvalidZeroSizeNote)
+    _E(InvalidZeroSizeNote)          \
+    _E(UnexpectedDelimiter)          \
+    _E(MissingDelimiter)             \
+    _E(MismatchedDelimiter)
 
 typedef enum {
 #define _E(name) name,
@@ -157,14 +160,25 @@ struct _TokenTree {
     };
 };
 
-Lex_TokenStream lexer_tokenize_source(String_View filename, String_View content);
+typedef struct {
+    Lex_Error type;
+    Lex_Span span;
+} Lex_StreamError;
+
+typedef union {
+    Lex_StreamError error; 
+    Lex_TokenStream stream;
+} Lex_TokenizeResult;
+
+Lex_TokenizeResult lexer_tokenize_source(String_View filename, String_View content, bool *success);
 
 void lexer_token_free(Lex_Token token);
-void lexer_token_stream_free(Lex_TokenStream stream);
+void lexer_token_stream_free(Lex_TokenStream *stream);
 
 void lexer_print_pos(String_Builder *sb, Lex_Pos pos);
 void lexer_print_span(String_Builder *sb, Lex_Span span);
 void lexer_print_token(String_Builder *sb, Lex_Token *token);
+void lexer_print_error(String_Builder *sb, Lex_Error *error);
 void lexer_print_delimited(String_Builder *sb, Lex_Delimited *token);
 
 #endif // LEXER_H_

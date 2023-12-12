@@ -52,12 +52,30 @@ int main() {
 
     fclose(file);
 
-    Lex_TokenStream stream = 
-        lexer_tokenize_source(sv_from_cstring(filename, strlen(filename)), sv_from_cstring(data, strlen(data)));
-    print_token_stream(stream, 0);
-    lexer_token_stream_free(stream);
+    bool success;
+    Lex_TokenizeResult result = 
+        lexer_tokenize_source(
+            sv_from_cstring(filename, strlen(filename)), 
+            sv_from_cstring(data, strlen(data)),
+            &success
+        );
 
+    if (!success) {
+        String_Builder sb = {0};
+        lexer_print_error(&sb, &result.error.type);
+        sb_append_cstr(&sb, " at ");
+        lexer_print_span(&sb, result.error.span);
+
+        printf(SV_FMT "\n", SV_ARG(sb_to_string_view(&sb)));
+        free(sb.items);
+        free(data);
+        exit(1);
+    }
+    Lex_TokenStream stream = result.stream;
+    print_token_stream(stream, 0);
+    lexer_token_stream_free(&stream);
     free(data);
+
 
     return 0;
 }

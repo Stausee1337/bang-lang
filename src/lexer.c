@@ -925,8 +925,10 @@ Lex_Delimiter _delimiter_from_char(char delim) {
     assert(false && "char is not a delimiter");
 }
 
-Lex_TokenStream _recursively_get_stream(Lexer_State *lexer, Lex_Delimiter delimiter) {
+#define ERROR_SUCCESS (Lex_Error)-1
+Lex_TokenStream _recursively_get_stream(Lexer_State *lexer, Lex_Delimiter delimiter, Lex_StreamError *error) {
     Lex_TokenStream stream = {0};
+
     while (true) {
         if (is_eof(lexer)) {
             goto end;
@@ -940,8 +942,14 @@ Lex_TokenStream _recursively_get_stream(Lexer_State *lexer, Lex_Delimiter delimi
             case '{':
             case '[':
             {
+                Lex_StreamError inner_error = { .type = ERROR_SUCCESS, .span = token.span };
                 Lex_Delimiter delim = _delimiter_from_char((char)token.kind);
-                Lex_TokenStream recursed = _recursively_get_stream(lexer, delim);
+                Lex_TokenStream recursed = _recursively_get_stream(lexer, delim, &inner_error);
+                if (inner_error.type != ERROR_SUCCESS) {
+                    *error = inner_error;
+                    goto error;
+                }
+
                 tree = (Lex_TokenTree) {
                     .type = Tt_Delimited,
                     .Tt_Delimited = (Lex_Delimited) {
@@ -959,13 +967,38 @@ Lex_TokenStream _recursively_get_stream(Lexer_State *lexer, Lex_Delimiter delimi
             case ']':
             {
                 Lex_Delimiter delim = _delimiter_from_char((char)token.kind);
-                assert(delimiter == delim && "return lexical error");
+                if (delimiter != delim) {
+                    if (delimiter == 0) {
+                        *error = (Lex_StreamError) {
+                            .type = UnexpectedDelimiter,
+                            .span = token.span
+                        };
+                    } else {
+                    *error = (Lex_StreamError) {
+                        .type = MismatchedDelimiter,
+                        .span = {
+                            .start = error->span.start,
+                            .end = token.span.start
+                        }
+                    };
+                    }
+                    goto error;
+                }
+                // assert(delimiter == delim && "TODO: ERROR: unexpected closing delimiters");
                 goto end;
             } break;
             case Tk_EOF:
             {
-                assert(delimiter == 0 && "return lexical error");
-            }
+                // assert(delimiter == 0 && "TODO: ERROR: missing closing delimiter");
+                if (delimiter != 0) {
+                    error->type = MissingDelimiter;
+                    goto error;
+                }
+                tree = (Lex_TokenTree) {
+                    .type = Tt_Token,
+                    .Tt_Token = token
+                };
+            } break;
             default:
             {
                 tree = (Lex_TokenTree) {
@@ -979,11 +1012,29 @@ Lex_TokenStream _recursively_get_stream(Lexer_State *lexer, Lex_Delimiter delimi
     }
 end:
     return stream;
+error:
+{
+    lexer_token_stream_free(&stream);
+    return stream;
+}
 }
 
-Lex_TokenStream lexer_tokenize_source(String_View filename, String_View content) {
+Lex_TokenizeResult lexer_tokenize_source(String_View filename, String_View content, bool *success) {
     Lexer_State lexer = lexer_init(filename, content);
-    return _recursively_get_stream(&lexer, /* delimiter */ 0);
+
+    Lex_StreamError error = { .type = ERROR_SUCCESS, .span = {{0}} };
+    Lex_TokenStream stream =  _recursively_get_stream(&lexer, /* delimiter */ 0, &error);
+
+    if (error.type != ERROR_SUCCESS) {
+        *success = false;
+        return (Lex_TokenizeResult) {
+            .error = error
+        };
+    }
+    *success = true;
+    return (Lex_TokenizeResult) {
+        .stream = stream
+    };
 }
 
 void lexer_token_free(Lex_Token token) {
@@ -1002,19 +1053,21 @@ void lexer_token_free(Lex_Token token) {
     }
 }
 
-void lexer_token_stream_free(Lex_TokenStream stream) {
-    for (size_t i = 0; i < stream.count; i++) {
-        Lex_TokenTree tree = stream.items[i];
+void lexer_token_stream_free(Lex_TokenStream *stream) {
+    for (size_t i = 0; i < stream->count; i++) {
+        Lex_TokenTree tree = stream->items[i];
         switch (tree.type) {
             case Tt_Delimited:
-                lexer_token_stream_free(tree.Tt_Delimited.stream);
+                lexer_token_stream_free(&tree.Tt_Delimited.stream);
                 break;
             case Tt_Token:
                 lexer_token_free(tree.Tt_Token);
                 break;
         }
     }
-    free(stream.items);
+    free(stream->items);
+    stream->count = 0;
+    stream->capacity = 0;
 }
 
 void lexer_print_pos(String_Builder *sb, Lex_Pos pos) {
@@ -1153,5 +1206,9 @@ void lexer_print_token(String_Builder *sb, Lex_Token *token) {
 
     sb_append_cstr(sb, " }");
 
+}
+
+void lexer_print_error(String_Builder *sb, Lex_Error *error) {
+    sb_append_cstr(sb, lexer_error_to_string(*error));
 }
 
