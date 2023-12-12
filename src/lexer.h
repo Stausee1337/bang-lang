@@ -121,24 +121,6 @@ typedef struct {
 #undef VARIANT_REAL
 #undef VARIANT
 
-typedef struct {
-    String_View filename;
-    String_View input;
-
-    size_t input_pos;
-    Lex_Pos file_pos;
-
-    size_t token_start;
-    size_t token_end;
-
-    Lex_Pos token_start_pos;
-    Lex_Pos token_end_pos;
-
-    String_View window;
-
-    Lex_Token token;
-} Lex_State;
-
 typedef struct _TokenTree Lex_TokenTree;
 
 typedef struct {

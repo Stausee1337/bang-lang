@@ -91,8 +91,26 @@ typedef struct {
     Lex_Pos token_start_pos;
 } State_Dump;
 
+typedef struct {
+    String_View filename;
+    String_View input;
+
+    size_t input_pos;
+    Lex_Pos file_pos;
+
+    size_t token_start;
+    size_t token_end;
+
+    Lex_Pos token_start_pos;
+    Lex_Pos token_end_pos;
+
+    String_View window;
+
+    Lex_Token token;
+} Lexer_State;
+
 static
-Char_Result lookahead(Lex_State *ls) {
+Char_Result lookahead(Lexer_State *ls) {
     if (ls->input_pos + 1 == ls->input.count - 1) {
         return NONE;
     }
@@ -100,17 +118,17 @@ Char_Result lookahead(Lex_State *ls) {
 }
 
 static
-char current(Lex_State *ls) {
+char current(Lexer_State *ls) {
     return SV_AT(&ls->input, ls->input_pos);
 }
 
 static
-bool is_whitespace(Lex_State *ls) {
+bool is_whitespace(Lexer_State *ls) {
     return current(ls) == ' ';
 }
 
 static
-int is_newline(Lex_State *ls) {
+int is_newline(Lexer_State *ls) {
     if (current(ls) == '\n' && IS_SOME(lookahead(ls), '\r')) {
         return 2;
     }
@@ -118,12 +136,12 @@ int is_newline(Lex_State *ls) {
 }
 
 static
-bool is_eof(Lex_State *ls) {
+bool is_eof(Lexer_State *ls) {
     return ls->token.kind == Tk_EOF;
 }
 
 static
-void bump(Lex_State *ls) {
+void bump(Lexer_State *ls) {
     if (is_eof(ls)) return; 
 
     size_t n_nl = 0;
@@ -145,13 +163,13 @@ void bump(Lex_State *ls) {
 }
 
 static
-void save(Lex_State *ls) {
+void save(Lexer_State *ls) {
     ls->token_start = ls->input_pos;
     ls->token_start_pos = ls->file_pos;
 }
 
 static
-State_Dump dump(Lex_State *ls) {
+State_Dump dump(Lexer_State *ls) {
     State_Dump sd;
     sd.token_start = ls->token_start;
     sd.token_start_pos = ls->token_start_pos;
@@ -159,26 +177,26 @@ State_Dump dump(Lex_State *ls) {
 }
 
 static
-void load(Lex_State *ls, State_Dump sd) {
+void load(Lexer_State *ls, State_Dump sd) {
     ls->token_start = sd.token_start;
     ls->token_start_pos = sd.token_start_pos;
 }
 
 static
-void restore(Lex_State *ls) {
+void restore(Lexer_State *ls) {
     ls->input_pos = ls->token_start;
     ls->file_pos = ls->token_start_pos;
 }
 
 static
-void create_window(Lex_State *ls) {
+void create_window(Lexer_State *ls) {
     size_t count = ls->input_pos - ls->token_start;
     ls->window.data = (ls->input.data + ls->token_start);
     ls->window.count = count;
 }
 
 static
-Lex_Span finish(Lex_State *ls) {
+Lex_Span finish(Lexer_State *ls) {
     ls->token_end_pos = ls->file_pos;
     ls->token_end = ls->input_pos;
     create_window(ls);
@@ -191,7 +209,7 @@ Lex_Span finish(Lex_State *ls) {
 }
 
 static
-Consume_Result consume_singleline_comment(Lex_State *ls) {
+Consume_Result consume_singleline_comment(Lexer_State *ls) {
     while (!is_newline(ls)) {
         bump(ls);
         if (is_eof(ls)) {
@@ -203,7 +221,7 @@ Consume_Result consume_singleline_comment(Lex_State *ls) {
 }
 
 static
-Consume_Result consume_multiline_comment(Lex_State *ls) {
+Consume_Result consume_multiline_comment(Lexer_State *ls) {
     size_t level = 0;
     while (true) {
         if (current(ls) == '*' && IS_SOME(lookahead(ls), '/')) {
@@ -226,7 +244,7 @@ end:
 }
 
 static
-Consume_Result consume_comment(Lex_State *ls) {
+Consume_Result consume_comment(Lexer_State *ls) {
     bump(ls);
     if (is_eof(ls)) {
         return Unmatched;
@@ -281,7 +299,7 @@ String_Builder window_to_string(String_View window) {
 }
 
 static
-Consume_Result consume_identifier(Lex_State *ls, bool simple) {
+Consume_Result consume_identifier(Lexer_State *ls, bool simple) {
     char curr = current(ls);
     if (curr == '#') {
         bump(ls);
@@ -343,7 +361,7 @@ bool _is_float_suffix(String_View sv) {
 }
 
 static
-bool _end_parse_number(Lex_State *ls, int base, size_t number_end_pos, Lex_NumberClass class) {
+bool _end_parse_number(Lexer_State *ls, int base, size_t number_end_pos, Lex_NumberClass class) {
     create_window(ls);
     int start = 0;
     if (base != 10) {
@@ -391,7 +409,7 @@ bool _end_parse_number(Lex_State *ls, int base, size_t number_end_pos, Lex_Numbe
 }
 
 static
-bool _check_multiple_dots_end(Lex_State *ls) {
+bool _check_multiple_dots_end(Lexer_State *ls) {
     size_t remaing_count = ls->input.count - ls->input_pos;
     if (remaing_count >= 2) {
         // check for multi dot syntax
@@ -406,7 +424,7 @@ bool _check_multiple_dots_end(Lex_State *ls) {
 }
 
 static
-Consume_Result consume_number_literal(Lex_State *ls) {
+Consume_Result consume_number_literal(Lexer_State *ls) {
     Char_Result next = lookahead(ls);
     bool literal_lowercase = IS_SOME(next, 'b') || IS_SOME(next, 'o') || IS_SOME(next, 'x');
     bool literal_uppercase = IS_SOME(next, 'B') || IS_SOME(next, 'O') || IS_SOME(next, 'X');
@@ -613,7 +631,7 @@ if (multiple_dots_in_float) {             \
 }
 
 static
-Consume_Result consume_punctuators(Lex_State *ls) {
+Consume_Result consume_punctuators(Lexer_State *ls) {
     // get the next 4 chars as int
     size_t remaing_count = ls->input.count - ls->input_pos;
     const char *string = ls->input.data + ls->input_pos;
@@ -670,7 +688,7 @@ int _unescape_char(char after_esc, char closing, char *res) {
 }
 
 static
-Consume_Result consume_char_literal(Lex_State *ls) {
+Consume_Result consume_char_literal(Lexer_State *ls) {
     char curr = current(ls);
 
     if (curr == 'b') {
@@ -736,7 +754,7 @@ Consume_Result consume_char_literal(Lex_State *ls) {
 }
 
 static
-Consume_Result consume_string_literal(Lex_State *ls) {
+Consume_Result consume_string_literal(Lexer_State *ls) {
     char curr = current(ls);
 
     if (curr == 'b') {
@@ -789,7 +807,7 @@ Consume_Result consume_string_literal(Lex_State *ls) {
 }
 
 static
-Consume_Result consume_note(Lex_State *ls) {
+Consume_Result consume_note(Lexer_State *ls) {
     bump(ls);
     if (is_eof(ls)) {
         FAIL(InvalidZeroSizeNote);
@@ -810,8 +828,8 @@ Consume_Result consume_note(Lex_State *ls) {
 }
 
 static
-Lex_State lexer_init(String_View filename, String_View input) {
-    return (Lex_State) {
+Lexer_State lexer_init(String_View filename, String_View input) {
+    return (Lexer_State) {
         .filename = filename,
         .input = input,
         .file_pos.col = 1,
@@ -820,7 +838,7 @@ Lex_State lexer_init(String_View filename, String_View input) {
 }
 
 static
-void lexer_next(Lex_State *lexer) {
+void lexer_next(Lexer_State *lexer) {
     if (lexer->input_pos == lexer->input.count) {
         goto eof;
     }
@@ -900,7 +918,7 @@ Lex_Delimiter _delimiter_from_char(char delim) {
     assert(false && "char is not a delimiter");
 }
 
-Lex_TokenStream _recursively_get_stream(Lex_State *lexer, Lex_Delimiter delimiter) {
+Lex_TokenStream _recursively_get_stream(Lexer_State *lexer, Lex_Delimiter delimiter) {
     Lex_TokenStream stream = {0};
     while (true) {
         if (is_eof(lexer)) {
@@ -957,7 +975,7 @@ end:
 }
 
 Lex_TokenStream lexer_tokenize_source(String_View filename, String_View content) {
-    Lex_State lexer = lexer_init(filename, content);
+    Lexer_State lexer = lexer_init(filename, content);
     return _recursively_get_stream(&lexer, /* delimiter */ 0);
 }
 
