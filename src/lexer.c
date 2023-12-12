@@ -197,7 +197,10 @@ void create_window(Lexer_State *ls) {
 
 static
 Lex_Span finish(Lexer_State *ls) {
-    ls->token_end_pos = ls->file_pos;
+    ls->token_end_pos = (Lex_Pos) {
+        .row = ls->file_pos.row,
+        .col = ls->file_pos.col - 1
+    };
     ls->token_end = ls->input_pos;
     create_window(ls);
 
@@ -857,7 +860,11 @@ eof:
         lexer->token_start_pos = lexer->file_pos;
         lexer->token = (Lex_Token) {
             .kind = Tk_EOF,
-            .span = finish(lexer)
+            .span = (Lex_Span) {
+                .filename = lexer->filename,
+                .start = lexer->token_start_pos,
+                .end = lexer->token_end_pos
+            }
         };
         return;
     }
