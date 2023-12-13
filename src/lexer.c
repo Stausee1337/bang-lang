@@ -211,6 +211,18 @@ Lex_Span finish(Lexer_State *ls) {
 }
 
 static
+String_Builder window_to_string(String_View window) {
+    char *str = malloc(window.count);
+    memcpy(str, window.data, window.count);
+
+    return (String_Builder) {
+        .items = str,
+        .count = window.count,
+        .capacity = window.count
+    };
+}
+
+static
 Consume_Result consume_singleline_comment(Lexer_State *ls) {
     while (!is_newline(ls)) {
         bump(ls);
@@ -219,7 +231,7 @@ Consume_Result consume_singleline_comment(Lexer_State *ls) {
         }
     }
     bump(ls);
-    MATCHED1(Comment);
+    MATCHED1(LineComment);
 }
 
 static
@@ -242,7 +254,8 @@ Consume_Result consume_multiline_comment(Lexer_State *ls) {
     }
 end:
     bump(ls);
-    MATCHED1(Comment);
+    create_window(ls);
+    MATCHED(BlockComment, .body = window_to_string(ls->window));
 }
 
 static
@@ -286,18 +299,6 @@ bool _match_keyword(String_View sv, Lex_Keyword *res) {
 
     free(str);
     return *res != K_Invalid;
-}
-
-static
-String_Builder window_to_string(String_View window) {
-    char *str = malloc(window.count);
-    memcpy(str, window.data, window.count);
-
-    return (String_Builder) {
-        .items = str,
-        .count = window.count,
-        .capacity = window.count
-    };
 }
 
 static

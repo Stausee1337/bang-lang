@@ -14,7 +14,10 @@ typedef Directive Lex_Directive;
 typedef Keyword Lex_Keyword;
 
 #define ENUMERATE_LEXER_TOKENS      \
-    VARIANT(Comment)                \
+    VARIANT(LineComment)            \
+    VARIANT(BlockComment, {         \
+        String_Builder body;        \
+    })                              \
     VARIANT(Error, {                \
         Lex_Error error;            \
     })                              \
