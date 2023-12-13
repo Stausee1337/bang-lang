@@ -1125,6 +1125,31 @@ void lexer_print_delimited(String_Builder *sb, Lex_Delimited *token) {
     sb_append_cstr(sb, " }");
 }
 
+inline static
+const char *tokenkind_to_string(Lex_TokenKind in) {
+    static const char *lexer_token_names[] = {
+        "EOF",
+#define VARIANT(name, ...) #name,
+        ENUMERATE_LEXER_TOKENS
+#undef VARIANT
+    };
+    assert(in < Tk_NumberOfTokens);
+
+    return lexer_token_names[in - Tk_EOF];
+}
+
+inline static
+const char *error_to_string(Lex_Error in) {
+    static const char *lexer_error_names[] = {
+#define _E(name) #name,
+        ENUMERATE_LEXER_ERRORS
+#undef _E
+    };
+    assert(in < NumberOfErrors);
+
+    return lexer_error_names[in];
+}
+
 void lexer_print_token(String_Builder *sb, Lex_Token *token) { 
     sb_append_cstr(sb, "Token { ");
     sb_append_cstr(sb, "type = ");
@@ -1132,7 +1157,7 @@ void lexer_print_token(String_Builder *sb, Lex_Token *token) {
     if (kind < 0x80) {
         da_append(sb, (char)kind);
     } else if (kind <= 0xff) {
-        sb_append_cstr(sb, lexer_tokenkind_to_string(kind));
+        sb_append_cstr(sb, tokenkind_to_string(kind));
     } else if (kind <= 0xffff) {
         da_append_many(sb, (char*)&kind, 2);
     } else if (kind <= 0xffffff) {
@@ -1198,7 +1223,7 @@ void lexer_print_token(String_Builder *sb, Lex_Token *token) {
         {
             Lex_TokenError err = token->Tk_Error;
             sb_append_cstr(sb, ", error = ");
-            sb_append_cstr(sb, lexer_error_to_string(err.error));
+            sb_append_cstr(sb, error_to_string(err.error));
         } 
         break;
         default: break;
@@ -1209,6 +1234,6 @@ void lexer_print_token(String_Builder *sb, Lex_Token *token) {
 }
 
 void lexer_print_error(String_Builder *sb, Lex_Error *error) {
-    sb_append_cstr(sb, lexer_error_to_string(*error));
+    sb_append_cstr(sb, error_to_string(*error));
 }
 
