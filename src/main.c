@@ -37,6 +37,8 @@ void print_token_stream(Lex_TokenStream stream, int level) {
     free(sb.items);
 }
 
+#include "parser.h"
+
 int main() {
     const char *filename = "stuff/test.txt";
     FILE *file = fopen(filename, "r");
@@ -72,7 +74,11 @@ int main() {
         exit(1);
     }
     Lex_TokenStream stream = result.stream;
-    print_token_stream(stream, 0);
+    // print_token_stream(stream, 0);
+
+    Ast_Expr *expr = parser_parse(stream);
+    (void) expr;
+
     lexer_token_stream_free(&stream);
     free(data);
 

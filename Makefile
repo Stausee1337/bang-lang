@@ -8,7 +8,7 @@ templ8: src/*.generated.h
 thirdparty: Thirdparty/csiphash.o
 
 out/bangc: src/*.c src/*.h Thirdparty/*.o
-	$(CC) $(CFLAGS) -o out/bangc src/lexer.c src/main.c src/strings.c Thirdparty/csiphash.o
+	$(CC) $(CFLAGS) -o out/bangc src/lexer.c src/main.c src/strings.c src/parser.c Thirdparty/csiphash.o
 
 src/%.generated.h: src/%.h.templ8
 	PYTHONPATH=$(PYTHONPATH) python3 -m Templ8 $<

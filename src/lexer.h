@@ -76,8 +76,9 @@ typedef enum {
 } Lex_Error;
 
 typedef enum {
-#define VARIANT(name, ...) Tk_##name,
+    Tk_INIT = -1,
     Tk_EOF = 0x80,
+#define VARIANT(name, ...) Tk_##name,
 ENUMERATE_LEXER_TOKENS
     Tk_NumberOfTokens
 #undef VARIANT
