@@ -151,11 +151,13 @@ ARROW           ->
 {% for enum : penums %}
 {% expand define_enum enum %}
 {% expand define_precdences enum %}
+{% expand enum_to_string enum %}
 {% expand phf_hash_map enum 'resolve' 'uint32_t' %}
 {% endfor %}
 
 {% for enum : tenums %}
 {% expand define_enum enum %}
+{% expand enum_to_string enum %}
 {% expand phf_hash_map enum 'resolve' 'uint32_t' %}
 {% endfor %}
 
