@@ -145,6 +145,7 @@ QUESTION        ?
 
 DOUBLE_COLON    ::
 DOUBLE_DOT      ..
+DOUBLE_AND      &&
 ARROW           ->
 {% endcode %}
 

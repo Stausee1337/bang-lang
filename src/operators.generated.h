@@ -351,6 +351,7 @@ bool check_is_punctuator(const char * in) {
 #define QUESTION '?'
 #define DOUBLE_COLON 0x00003a3a
 #define DOUBLE_DOT 0x00002e2e
+#define DOUBLE_AND 0x00002626
 #define ARROW 0x00003e2d
 
 #endif //OPERATORS_H_
