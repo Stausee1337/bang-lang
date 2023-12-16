@@ -16,16 +16,16 @@ uint64_t thirdparty_siphash24(const void *src, unsigned long src_sz, const char 
 
 typedef enum {
     Bo_Invalid = -1,
-    Bo_Plus,
-    Bo_Minus,
     Bo_Mul,
     Bo_Div,
     Bo_Mod,
-    Bo_BOr,
-    Bo_BAnd,
-    Bo_BXor,
+    Bo_Plus,
+    Bo_Minus,
     Bo_Shl,
     Bo_Shr,
+    Bo_BAnd,
+    Bo_BXor,
+    Bo_BOr,
     Bo_Eq,
     Bo_Ne,
     Bo_Gt,
@@ -45,7 +45,7 @@ unsigned char binary_op_get_precedence(BinaryOp in);
 OPERATORS_H_PREFIX
 unsigned char binary_op_get_precedence(BinaryOp in) {
     static const unsigned char bo_operator_precedences[NUM_ENTRIES_BINARY_OP] = {
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, };
+        11, 11, 11, 10, 10, 9, 9, 8, 7, 6, 5, 5, 5, 5, 5, 5, 4, 3, };
 
     assert(in < NUM_ENTRIES_BINARY_OP);
     return bo_operator_precedences[in];
@@ -58,16 +58,16 @@ const char *binary_op_to_string(BinaryOp in);
 OPERATORS_H_PREFIX
 const char *binary_op_to_string(BinaryOp in) {
     static const char *binary_op_str_map[NUM_ENTRIES_BINARY_OP] = {
-        "Plus",
-        "Minus",
         "Mul",
         "Div",
         "Mod",
-        "BOr",
-        "BAnd",
-        "BXor",
+        "Plus",
+        "Minus",
         "Shl",
         "Shr",
+        "BAnd",
+        "BXor",
+        "BOr",
         "Eq",
         "Ne",
         "Gt",
@@ -90,22 +90,22 @@ OPERATORS_H_PREFIX
 BinaryOp binary_op_resolve(uint32_t in) {
     static const struct _bo_struct_tuple { uint32_t _0; BinaryOp _1; } _bo_entries[NUM_ENTRIES_BINARY_OP] = {
         { 0x0000003c, Bo_Lt },
-        { 0x0000007c, Bo_Or },
+        { 0x0000007c, Bo_BOr },
         { 0x00003c3c, Bo_Shl },
         { 0x0000002d, Bo_Minus },
         { 0x00003d3e, Bo_Ge },
         { 0x00003d3d, Bo_Eq },
-        { 0x00000026, Bo_And },
+        { 0x00000026, Bo_BAnd },
         { 0x00000025, Bo_Mod },
         { 0x0000003e, Bo_Gt },
-        { 0x00002626, Bo_BAnd },
+        { 0x00002626, Bo_And },
         { 0x0000005e, Bo_BXor },
         { 0x0000002a, Bo_Mul },
         { 0x0000002f, Bo_Div },
         { 0x00003e3e, Bo_Shr },
         { 0x00003d3c, Bo_Le },
         { 0x0000002b, Bo_Plus },
-        { 0x00007c7c, Bo_BOr },
+        { 0x00007c7c, Bo_Or },
         { 0x00003d21, Bo_Ne },
     };
     
