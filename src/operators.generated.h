@@ -233,7 +233,7 @@ AssignmentOp assignment_op_resolve(uint32_t in) {
 }
 #endif //OPERATORS_H_IMPLEMENTATION
 
-#define NUM_ENTRIES_UNARY_OP 6
+#define NUM_ENTRIES_UNARY_OP 5
 
 typedef enum {
     Uo_Invalid = -1,
@@ -241,7 +241,6 @@ typedef enum {
     Uo_Not,
     Uo_Plus,
     Uo_Minus,
-    Uo_Address,
     Uo_Deref,
     Uo_NumberOfElements
 } UnaryOp;
@@ -258,7 +257,6 @@ const char *unary_op_to_string(UnaryOp in) {
         "Not",
         "Plus",
         "Minus",
-        "Address",
         "Deref",
     };
     assert(in < NUM_ENTRIES_UNARY_OP);
@@ -273,18 +271,17 @@ UnaryOp unary_op_resolve(uint32_t in);
 OPERATORS_H_PREFIX
 UnaryOp unary_op_resolve(uint32_t in) {
     static const struct _uo_struct_tuple { uint32_t _0; UnaryOp _1; } _uo_entries[NUM_ENTRIES_UNARY_OP] = {
-        { 0x0000002b, Uo_Plus },
-        { 0x00000026, Uo_Address },
-        { 0x0000007e, Uo_BitwiseNot },
-        { 0x0000002a, Uo_Deref },
         { 0x0000002d, Uo_Minus },
+        { 0x0000002b, Uo_Plus },
+        { 0x0000007e, Uo_BitwiseNot },
         { 0x00000021, Uo_Not },
+        { 0x0000002a, Uo_Deref },
     };
     
-#define NUM_UO_DISPS 2
+#define NUM_UO_DISPS 1
     static const uint32_t _uo_disps[NUM_UO_DISPS][2] = 
-        { { 2, 0 }, { 0, 5 },  };
-    static const char* _uo_hashkey = "\x00\x00\x00\x00\x00\x00\x00\x00P\xdb\xb1\xeb\x9a\xa1K\x95";
+        { { 0, 0 },  };
+    static const char* _uo_hashkey = "\x00\x00\x00\x00\x00\x00\x00\x00D\x09~\x15\xca\xf7\xe3p";
 
     uint64_t hash = thirdparty_siphash24(&in, sizeof(in), _uo_hashkey);
     const uint32_t lower = hash & 0xffffffff;
@@ -349,6 +346,7 @@ bool check_is_punctuator(const char * in) {
 #define DOT '.'
 #define SEMICOLON ';'
 #define QUESTION '?'
+#define AMPERSAND '&'
 #define DOUBLE_COLON 0x00003a3a
 #define DOUBLE_DOT 0x00002e2e
 #define DOUBLE_AND 0x00002626

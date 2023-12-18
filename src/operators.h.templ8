@@ -124,7 +124,6 @@ enum UnaryOp {
     Not(!);
     Plus(+);
     Minus(-);
-    Address(&);
     Deref(*);
 }
 {% endcode %}
@@ -142,6 +141,7 @@ COMMA           ,
 DOT             .
 SEMICOLON       ;
 QUESTION        ?
+AMPERSAND       &
 
 DOUBLE_COLON    ::
 DOUBLE_DOT      ..
