@@ -77,7 +77,10 @@ int main() {
     // print_token_stream(stream, 0);
 
     Ast_Expr *expr = parser_parse(stream);
-    (void) expr;
+    String_Builder sb = {0};
+    ast_print_expr(&sb, expr, 0);
+
+    printf(SV_FMT"\n", SV_ARG(sb_to_string_view(&sb)));
 
     lexer_token_stream_free(&stream);
     free(data);

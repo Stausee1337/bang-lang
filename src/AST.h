@@ -2,25 +2,96 @@
 #define AST_H_
 
 #include "lexer.h"
+#include "strings.h"
 
-#define ENUMERATE_EXPR_NODES    \
-    _NODE(Empty, { })           \
+// FIXME: Ident should be a struct containing the 
+//        definition span and the name should be stored
+//        as an index in a symbol table
 
-enum Ast_ExprKind {
+typedef struct _Ast_Expr Ast_Expr;
+
+typedef struct {
+    Ast_Expr **items;
+    size_t count;
+    size_t capacity;
+} Ast_Exprs;
+
+typedef struct {
+    String_Builder ident;
+    // TODO: Support Generic Arguments
+} Ast_PathSegment;
+
+typedef struct {
+    Ast_PathSegment *items;
+    size_t count;
+    size_t capacity;
+} Ast_Path;
+
+#define ENUMERATE_EXPR_NODES                \
+    _NODE(Literal, {                        \
+        enum {                              \
+            L_String,                       \
+            L_Char,                         \
+            L_Integer,                      \
+            L_Float,                        \
+            L_Boolean,                      \
+            L_Nil                           \
+        } kind;                             \
+        union {                             \
+            String_Builder string;          \
+            uint32_t wchar;                 \
+            bool boolean;                   \
+            uint32_t integer;               \
+            double floating;                \
+        };                                  \
+        Lex_NumberClass nclass;             \
+    })                                      \
+    _NODE(Path, {                           \
+        Ast_Path path;                      \
+    })                                      \
+    _NODE(Unary, {                          \
+        UnaryOp op;                         \
+        Ast_Expr *expr;                     \
+    })                                      \
+    _NODE(Call, {                           \
+        Ast_Expr *function;                 \
+        Ast_Exprs arguments;                \
+    })                                      \
+    _NODE(Member, {                         \
+        Ast_Expr *expr;                     \
+        String_Builder ident;               \
+    })                                      \
+    _NODE(Paren, { Ast_Expr *expr; })       \
+    _NODE(Binary, {                         \
+        BinaryOp op;                        \
+        Ast_Expr *lhs;                      \
+        Ast_Expr *rhs;                      \
+    })                                      \
+    _NODE(Assign, {                         \
+        AssignmentOp op;                    \
+        Ast_Expr *lhs;                      \
+        Ast_Expr *rhs;                      \
+    })                                      \
+    _NODE(Refrence, {                       \
+        Ast_Expr *expr;                     \
+    })                                      \
+
+typedef enum {
 #define _NODE(name, ...) name##_kind,
     ENUMERATE_EXPR_NODES
 #undef _NODE
-};
+    Expr_NumberOfElements
+} Ast_ExprKind;
 
-typedef struct {
-    enum Ast_ExprKind kind;
+struct _Ast_Expr {
+    Ast_ExprKind kind;
     union {
-#define _NODE(name, body) struct body name;
+#define _NODE(name, ...) struct __VA_ARGS__ name;
         ENUMERATE_EXPR_NODES
 #undef _NODE
     };
     Lex_Span span;
-} Ast_Expr;
+};
 
 #define _new_expr1(variant) (Ast_Expr){ .kind = variant##_kind, .variant =
 #define _new_expr2(_span, ...) __VA_ARGS__, .span = (_span) }
@@ -58,5 +129,7 @@ typedef struct {
 #define bswitch(expr, ...) { typeof((expr)) __expr = (expr); switch (__expr->kind) __VA_ARGS__ }
 #define bind(name, ...) \
     case name##_kind: { typeof(__expr->name) __variant = __expr->name; intermediate __VA_ARGS__ } break;
+
+void ast_print_expr(String_Builder *sb, Ast_Expr *expr, uint32_t level);
 
 #endif //AST_H_
