@@ -4,6 +4,6 @@
 #include "AST.h"
 #include "lexer.h"
 
-Ast_Expr *parser_parse(Lex_TokenStream stream);
+Ast_Stmt *parser_parse(Lex_TokenStream stream);
 
 #endif // PRASER_H_

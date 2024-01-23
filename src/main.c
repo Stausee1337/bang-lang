@@ -76,9 +76,9 @@ int main() {
     Lex_TokenStream stream = result.stream;
     // print_token_stream(stream, 0);
 
-    Ast_Expr *expr = parser_parse(stream);
+    Ast_Stmt* stmt = parser_parse(stream);
     String_Builder sb = {0};
-    ast_print_expr(&sb, expr, 0);
+    ast_print_stmt(&sb, stmt, 0);
 
     printf(SV_FMT"\n", SV_ARG(sb_to_string_view(&sb)));
 
