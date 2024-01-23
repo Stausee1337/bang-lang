@@ -123,7 +123,8 @@ char current(Lexer_State *ls) {
 
 static
 bool is_whitespace(Lexer_State *ls) {
-    return current(ls) == ' ';
+    char curr = current(ls);
+    return curr == ' ' || (curr >= '\x09' && curr <= '\x0d');
 }
 
 static
@@ -1125,7 +1126,7 @@ void lexer_print_delimited(String_Builder *sb, Lex_Delimited *token) {
     sb_append_cstr(sb, " }");
 }
 
-inline static
+static inline
 const char *tokenkind_to_string(Lex_TokenKind in) {
     static const char *lexer_token_names[] = {
         "EOF",
