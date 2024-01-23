@@ -32,11 +32,14 @@ enum Keyword {
 
     Break;
     Continue;
-    
+
     Fn;
     Enum;
     Struct;
     Variant;
+
+    Const;
+    Let;
 }
 
 enum Directive {
