@@ -8,25 +8,6 @@
 //        definition span and the name should be stored
 //        as an index in a symbol table
 
-typedef struct _Ast_Expr Ast_Expr;
-
-typedef struct {
-    Ast_Expr **items;
-    size_t count;
-    size_t capacity;
-} Ast_Exprs;
-
-typedef struct {
-    String_Builder ident;
-    // TODO: Support Generic Arguments
-} Ast_PathSegment;
-
-typedef struct {
-    Ast_PathSegment *items;
-    size_t count;
-    size_t capacity;
-} Ast_Path;
-
 #define ENUMERATE_EXPR_NODES                \
     _NODE(Literal, {                        \
         enum {                              \
@@ -57,6 +38,10 @@ typedef struct {
         Ast_Expr *function;                 \
         Ast_Exprs arguments;                \
     })                                      \
+    _NODE(Subscript, {                      \
+        Ast_Expr *base;                     \
+        Ast_Expr *subscript;                \
+    })                                      \
     _NODE(Member, {                         \
         Ast_Expr *expr;                     \
         String_Builder ident;               \
@@ -75,6 +60,34 @@ typedef struct {
     _NODE(Refrence, {                       \
         Ast_Expr *expr;                     \
     })                                      \
+    _NODE(If, {                             \
+        Ast_Expr *condition;                \
+        Ast_Block* if_branch;               \
+        Ast_Expr* else_block;               \
+    })                                      \
+    _NODE(Block, {                          \
+        Ast_Block* block;                   \
+    })                                      \
+
+typedef struct _Ast_Expr Ast_Expr;
+typedef struct _Ast_Block Ast_Block;
+
+typedef struct {
+    Ast_Expr **items;
+    size_t count;
+    size_t capacity;
+} Ast_Exprs;
+
+typedef struct {
+    String_Builder ident;
+    // TODO: Support Generic Arguments
+} Ast_PathSegment;
+
+typedef struct {
+    Ast_PathSegment *items;
+    size_t count;
+    size_t capacity;
+} Ast_Path;
 
 typedef enum {
 #define _NODE(name, ...) name##_kind,
@@ -93,9 +106,47 @@ struct _Ast_Expr {
     Lex_Span span;
 };
 
-#define _new_expr1(variant) (Ast_Expr){ .kind = variant##_kind, .variant =
-#define _new_expr2(_span, ...) __VA_ARGS__, .span = (_span) }
-#define create_expr(variant) _new_expr1(variant)_new_expr2
+#define ENUMERATE_STMT_NODES                \
+    _NODE(Expr, {                           \
+        Ast_Expr *expr;                     \
+        bool semicolon;                     \
+    })                                      \
+
+typedef struct _Ast_Stmt Ast_Stmt;
+
+typedef struct {
+    Ast_Stmt **items;
+    size_t count;
+    size_t capacity;
+} Ast_Stmts;
+
+struct _Ast_Block {
+    Ast_Stmts stmts;
+    /* TODO: add label identifier */
+    Lex_Span span;
+};
+
+typedef enum {
+#define _NODE(name, ...) name##_kind,
+    ENUMERATE_STMT_NODES
+#undef _NODE
+    Stmt_NumberOfElements
+} Ast_StmtKind;
+
+struct _Ast_Stmt {
+    Ast_StmtKind kind;
+    union {
+#define _NODE(name, ...) struct __VA_ARGS__ name;
+        ENUMERATE_STMT_NODES
+#undef _NODE
+    };
+    Lex_Span span;
+};
+
+#define _new_1(Typ, variant) (Typ){ .kind = variant##_kind, .variant =
+#define _new_2(_span, ...) __VA_ARGS__, .span = (_span) }
+#define create_expr(variant) _new_1(Ast_Expr, variant)_new_2
+#define create_stmt(variant) _new_1(Ast_Stmt, variant)_new_2
 
 #define intermediate(...) intermediate_inter(__VA_ARGS__, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1)
 #define intermediate_inter(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, count, ...) \
@@ -131,5 +182,7 @@ struct _Ast_Expr {
     case name##_kind: { typeof(__expr->name) __variant = __expr->name; intermediate __VA_ARGS__ } break;
 
 void ast_print_expr(String_Builder *sb, Ast_Expr *expr, uint32_t level);
+void ast_print_stmt(String_Builder *sb, Ast_Stmt *stmt, uint32_t level);
+void ast_print_block(String_Builder *sb, Ast_Block *block, uint32_t level);
 
 #endif //AST_H_

@@ -4,7 +4,6 @@
 
 #include "parser.h"
 #include "dynarray.h"
-#include "strings.h"
 
 #define New_Impl(type, expr) \
     ({ type __value = (expr); heap_alloc(&__value, sizeof(__value)); })
@@ -126,7 +125,7 @@ Lex_Token expect(Parser *p, Lex_TokenKind kind) {
 }
 
 static
-Ast_Expr *parse_expression(Parser *p, int min_prec);
+Ast_Expr *parse_expr_assoc(Parser *p, int min_prec);
 
 Ast_Expr *parse_path(Parser *p) {
     Ast_Path path = {0};
@@ -151,6 +150,47 @@ Ast_Expr *parse_path(Parser *p) {
     }
 
     return New(create_expr(Path)(span, { .path = path }));
+}
+
+Ast_Block *parse_block(Parser *p);
+Ast_Block *make_block(Ast_Expr *expr);
+Ast_Expr *make_block_expr(Ast_Block *block);
+
+static
+Ast_Expr *parse_if_expr(Parser *p) {
+    Lex_Pos start = p->token.span.start;
+    next_token(p); // skip `if`
+    
+    Ast_Expr *cond = parse_expr_assoc(p, 0);
+    Ast_Block *body;
+    if (p->token.kind == '{') {
+        body = parse_block(p);
+    } else {
+        body = make_block(parse_expr_assoc(p, 0));
+    }
+
+    Lex_Span span = {
+        .start = start,
+        .end = body->span.end,
+        .filename = body->span.filename
+    };
+
+    Ast_Expr *if_expresssion = New(create_expr(If)(span, { .condition = cond, .if_branch = body }));
+    if (p->token.kind == Tk_Keyword && p->token.Tk_Keyword.keyword == K_Else) {
+        next_token(p); // skip `else`
+        Ast_Expr *else_branch = NULL;
+        if (p->token.kind == Tk_Keyword && p->token.Tk_Keyword.keyword == K_If)  {
+            else_branch = parse_if_expr(p);
+        } else {
+            if (p->token.kind == '{') {
+                else_branch = make_block_expr(parse_block(p));
+            } else {
+                else_branch = make_block_expr(make_block(parse_expr_assoc(p, 0)));
+            }
+        }
+        if_expresssion->If.else_block = else_branch;
+    }
+    return if_expresssion;
 }
 
 #define return_defer(...) \
@@ -201,13 +241,15 @@ Ast_Expr *parse_primary(Parser *p) {
                     return_defer(New(create_expr(Literal)(token.span, {
                         .kind = L_Nil,
                     })));
+                case K_If:
+                    return parse_if_expr(p);
                 default: break;
             }
         } break;
         case '(': {
             // TODO: parsing tuples and arrow functions () -> something
             next_token(p);
-            Ast_Expr *expr = parse_expression(p, 0);
+            Ast_Expr *expr = parse_expr_assoc(p, 0);
             Lex_Token endtoken = expect(p, ')');
             Lex_Span span = {
                 .start = token.span.start,
@@ -215,6 +257,10 @@ Ast_Expr *parse_primary(Parser *p) {
                 .filename = token.span.filename
             };
             return New(create_expr(Paren)(span, { .expr = expr }));
+        } break;
+        case '{': {
+            Ast_Block *block = parse_block(p);
+            return New(create_expr(Block)(block->span, { .block = block }));
         } break;
         case Tk_Ident:
             return parse_path(p);
@@ -227,6 +273,22 @@ defer:
 }
 
 static
+Ast_Expr *parse_subscript(Parser *p, Ast_Expr *base) {
+    expect(p, (Lex_TokenKind)'[');
+
+    // TODO: implement subscirpt multiple arguments (auto tuple generation)
+    Ast_Expr *subscript = parse_expr_assoc(p, 0);
+    Lex_Pos end = expect(p, (Lex_TokenKind)']').span.end;
+
+    Lex_Span span = {
+        .start = base->span.start,
+        .end = end,
+        .filename = base->span.filename
+    };
+    return New(create_expr(Subscript)(span, { .base = base, .subscript = subscript }));
+}
+
+static
 Ast_Expr *parse_call(Parser *p, Ast_Expr *base) {
     expect(p, (Lex_TokenKind)'(');
 
@@ -235,7 +297,7 @@ Ast_Expr *parse_call(Parser *p, Ast_Expr *base) {
         goto end;
     }
     while (true) {
-        Ast_Expr *arg = parse_expression(p, 0);
+        Ast_Expr *arg = parse_expr_assoc(p, 0);
         da_append(&arguments, arg);
         Lex_TokenKind kind = p->token.kind;
         if (kind != ',' && kind != ')') {
@@ -251,12 +313,12 @@ Ast_Expr *parse_call(Parser *p, Ast_Expr *base) {
 
 end:
 {
-    Lex_Token endtoken = p->token;
+    Lex_Pos end = p->token.span.end;
     next_token(p); // skip )
     Lex_Span span = {
         .start = base->span.start,
-        .end = endtoken.span.end,
-        .filename = endtoken.span.filename
+        .end = end,
+        .filename = base->span.filename
     };
     return New(create_expr(Call)(span, { .function = base, .arguments = arguments }));
 }
@@ -270,7 +332,8 @@ Ast_Expr *parse_postfix(Parser *p, Ast_Expr *base, bool *matched) {
             return parse_call(p, base);
         } break;
         case '[': // parse subscript
-            assert(false && "Not implemented");
+            *matched = true;
+            return parse_subscript(p, base);
             break;
         case '.': {
             // TODO: Parse buitlin suffixes like `.!` or `.?`
@@ -392,7 +455,7 @@ Ast_Expr *parse_expr_prefix(Parser *p) {
 }
 
 static
-Ast_Expr *parse_expression(Parser *p, int min_prec) {
+Ast_Expr *parse_expr_assoc(Parser *p, int min_prec) {
     Ast_Expr *lhs = parse_expr_prefix(p);
 
     AssocOp op;
@@ -405,7 +468,7 @@ Ast_Expr *parse_expression(Parser *p, int min_prec) {
 
         // TODO: detect chained comparison
 
-        Ast_Expr *rhs = parse_expression(p, prec + op.accociativity);
+        Ast_Expr *rhs = parse_expr_assoc(p, prec + op.accociativity);
         Lex_Span span = {
             .start = lhs->span.start,
             .end = rhs->span.end,
@@ -426,7 +489,70 @@ Ast_Expr *parse_expression(Parser *p, int min_prec) {
     return lhs;
 }
 
-Ast_Expr *parser_parse(Lex_TokenStream stream) {
+bool is_block_expr(Ast_ExprKind kind) {
+    return kind == If_kind || kind == Block_kind;
+}
+
+Ast_Stmt *parse_stmt(Parser *p) {
+    while (true) {
+        // TODO: generate redundant semicolons warning
+        if (p->token.kind != ';') {
+            break;
+        }
+        next_token(p);
+    }
+    Ast_Expr *expr = parse_expr_assoc(p, 0);
+    Lex_Pos end;
+    bool block_expr = is_block_expr(expr->kind);
+    if (!block_expr) {
+        end = expect(p, ';').span.end;
+    } else {
+        end = expr->span.end;
+    }
+    Lex_Span span = {
+        .start = expr->span.start,
+        .end = end,
+        .filename = expr->span.filename
+    };
+    return New(create_stmt(Expr)(span, { .expr = expr, .semicolon = !block_expr }));
+}
+
+Ast_Block *parse_block(Parser *p) {
+    Lex_Pos start = expect(p, '{').span.start;
+    Ast_Stmts stmts = {0};
+
+    bool is_empty_block = p->token.kind == '}';
+    while (!is_empty_block) {
+        Ast_Stmt *stmt = parse_stmt(p);
+        da_append(&stmts, stmt);
+
+        if (p->token.kind == '}') {
+            break;
+        }
+    }
+    Lex_Span endspan = p->token.span;
+    next_token(p); // skip }
+    Lex_Span span = {
+        .start = start,
+        .end = endspan.end,
+        .filename = endspan.filename
+    };
+    return New(((Ast_Block) { .stmts = stmts, .span = span }));
+}
+
+
+Ast_Block *make_block(Ast_Expr* expr) {
+    Ast_Stmt *stmt = New(create_stmt(Expr)(expr->span, { .expr = expr, .semicolon = false }));
+    Ast_Stmts stmts = {0};
+    da_append(&stmts, stmt);
+    return New(((Ast_Block) { .stmts = stmts, .span = expr->span }));
+}
+
+Ast_Expr *make_block_expr(Ast_Block *block) {
+    return New(create_expr(Block)(block->span, { .block = block }));
+}
+
+Ast_Stmt *parser_parse(Lex_TokenStream stream) {
     Parser p = {
         .token = {
             .kind = Tk_INIT,
@@ -438,6 +564,6 @@ Ast_Expr *parser_parse(Lex_TokenStream stream) {
         }
     };
     next_token(&p);
-    return parse_expression(&p, 0);
+    return parse_stmt(&p);
 }
 
