@@ -13,6 +13,17 @@ const char *expr_to_string(Ast_ExprKind kind) {
     return expr_names[kind];
 }
 
+static 
+const char *stmt_to_string(Ast_StmtKind kind) {
+#define _NODE(name, ...) #name,
+    static const char *stmt_names[] = {
+        ENUMERATE_STMT_NODES
+    };
+#undef _NODE
+    assert(kind < Stmt_NumberOfElements);
+    return stmt_names[kind];
+}
+
 #define INDENT "    "
 void indent(String_Builder *sb, uint32_t level) {
     for (uint32_t i = 0; i < level; i++) {
@@ -40,7 +51,7 @@ void ast_print_expr(String_Builder *sb, Ast_Expr *expr, uint32_t level) {
                     da_append(sb, (char)wchar);
                     break;
                 case L_Boolean:
-                    sb_append_cstr(sb, ", char = ");
+                    sb_append_cstr(sb, ", boolean = ");
                     sb_append_cstr(sb, boolean ? "true" : "false");
                     break;
                 case L_Nil:
@@ -146,9 +157,69 @@ void ast_print_expr(String_Builder *sb, Ast_Expr *expr, uint32_t level) {
             sb_append_cstr(sb, "expr = ");
             ast_print_expr(sb, expr, level + 1);
         });
+        bind(If, (condition, if_branch, else_block) {
+            sb_append_cstr(sb, ",\n");
+            indent(sb, level + 1);
+            sb_append_cstr(sb, "condition = ");
+            ast_print_expr(sb, condition, level + 1);
+
+            sb_append_cstr(sb, ",\n");
+            indent(sb, level + 1);
+            sb_append_cstr(sb, "if_branch = ");
+            ast_print_block(sb, if_branch, level + 1);
+
+            sb_append_cstr(sb, ",\n");
+            indent(sb, level + 1);
+            sb_append_cstr(sb, "else_block = ");
+            if (else_block != NULL) {
+                ast_print_expr(sb, else_block, level + 1);
+            } else {
+                sb_append_cstr(sb, "NULL");
+            }
+        });
+        bind(Block, (block) {
+            sb_append_cstr(sb, ",\n");
+            indent(sb, level + 1);
+            sb_append_cstr(sb, "block = ");
+            ast_print_block(sb, block, level + 1);
+        });
         default: break;
     });
 
     sb_append_cstr(sb, " }");
 }
 
+void ast_print_stmt(String_Builder *sb, Ast_Stmt *stmt, uint32_t level) {
+    sb_append_cstr(sb, stmt_to_string(stmt->kind));
+    sb_append_cstr(sb, " { ");
+
+    sb_append_cstr(sb, "span = ");
+    lexer_print_span(sb, stmt->span);
+
+    bswitch(stmt, {
+        bind(Expr, (expr, semicolon) {
+            sb_append_cstr(sb, ", semi = ");
+            sb_append_cstr(sb, semicolon ? "true" : "false");
+            sb_append_cstr(sb, ",\n");
+            indent(sb, level + 1);
+            sb_append_cstr(sb, "expr = ");
+            ast_print_expr(sb, expr, level + 1);
+        });
+        default: break;
+    });
+
+    sb_append_cstr(sb, " }");
+}
+
+void ast_print_block(String_Builder *sb, Ast_Block *block, uint32_t level) {
+    sb_append_cstr(sb, "Block [\n");
+
+    for (size_t i = 0; i < block->stmts.count; i++) {
+        Ast_Stmt *stmt = block->stmts.items[i];
+        indent(sb, level + 1);
+        ast_print_stmt(sb, stmt, level + 1);
+        sb_append_cstr(sb, ",\n");
+    }
+    indent(sb, level);
+    sb_append_cstr(sb, "]");
+}
