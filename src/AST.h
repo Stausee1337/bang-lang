@@ -127,10 +127,12 @@ typedef struct {
     _NODE(Ref, {                            \
         Ast_Type *ty;                       \
         Ast_Mutability mut;                 \
+        bool nullable;                      \
     })                                      \
     _NODE(Ptr, {                            \
         Ast_Type *ty;                       \
         Ast_Mutability mut;                 \
+        bool nullable;                      \
     })                                      \
     _NODE(Generic, {                        \
         Ast_Type *base;                     \

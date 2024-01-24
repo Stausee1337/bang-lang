@@ -272,6 +272,9 @@ do {                                                    \
     sb_append_cstr(sb, ", mut = ");                     \
     sb_append_cstr(sb, mut == M_Mut ? "Mut" : "Const"); \
                                                         \
+    sb_append_cstr(sb, ", nullable = ");                \
+    sb_append_cstr(sb, nullable ? "true" : "false");    \
+                                                        \
     sb_append_cstr(sb, ",\n");                          \
     indent(sb, level + 1);                              \
     sb_append_cstr(sb, "ty = ");                        \
@@ -294,10 +297,10 @@ do {                                    \
         bind(Owned, (ty) {
             PRINT_TY
         });
-        bind(Ref, (ty, mut) {
+        bind(Ref, (ty, mut, nullable) {
             PRINT_MUT_TY
         });
-        bind(Ptr, (ty, mut) {
+        bind(Ptr, (ty, mut, nullable) {
             PRINT_MUT_TY
         });
         bind(TyArray, (ty, size) {

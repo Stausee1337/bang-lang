@@ -519,12 +519,83 @@ Ast_Type *parse_type(Parser *p) {
             Ast_Path path = parse_path(p);
             ty = New(create_type(TyPath)(path.span, { .path = path }));
         } break;
+        case '[': {
+            next_token(p);
+            bool is_slice = true;
+            size_t size = 0;
+            if (p->token.kind == Tk_Number) {
+                is_slice = false;
+                size = p->token.Tk_Number.number.integer;
+                next_token(p);
+            }
+            expect(p, ']');
+            Ast_Type *ty = parse_type(p);
+            Lex_Span span = {
+                .start = token.span.start,
+                .end = ty->span.end,
+                .filename = token.span.filename
+            };
+            if (is_slice) {
+                return New(create_type(TySlice)(span, { .ty = ty }));
+            } else {
+                return New(create_type(TyArray)(span, { .ty = ty, .size = size }));
+            }
+        } break;
+        case '(': {
+            next_token(p);
+            Ast_Tys types = {0};
+            while (true) {
+                Ast_Type *tuple_arg = parse_type(p);
+                if (p->token.kind == ')') {
+                    if (types.count == 0)
+                        ty = tuple_arg;
+                    else
+                        da_append(&types, tuple_arg);
+                    break;
+                } else if (p->token.kind == ',') {
+                    next_token(p);
+                    da_append(&types, tuple_arg);
+                }
+            }
+            Lex_Pos end = p->token.span.end;
+            next_token(p);
+            if (ty == NULL) {
+                Lex_Span span = {
+                    .start = token.span.start,
+                    .end = end,
+                    .filename = token.span.filename
+                };
+                ty = New(create_type(TyTuple)(span, { .types = types }));
+            }
+        } break;
         case '&':
-        case '*':
-        case '[':
-        case '(':
-            assert(false && "Type parsing of refs, ptrs, arrays, slices and tuples is not implemented yet");
-            break; 
+        case '*': {
+            next_token(p);
+            Ast_Mutability mut = M_Const;
+            if (p->token.kind == Tk_Keyword && p->token.Tk_Keyword.keyword == K_Let) {
+                mut = M_Mut;
+                next_token(p);
+            }
+            Ast_Type *ty = parse_type(p);
+
+            Lex_Pos end = ty->span.end;
+            bool nullable = false;
+            if (ty->kind == Nullable_kind) {
+                Ast_Type *inner = ty->Nullable.ty;
+                free(ty);
+                ty = inner;
+                nullable = true;
+            }
+            Lex_Span span =  {
+                .start = token.span.start,
+                .end = end,
+                .filename = token.span.filename
+            };
+            if (token.kind == '&') {
+                return New(create_type(Ref)(span, { .ty = ty, .mut = mut, .nullable = nullable }));
+            }
+            return New(create_type(Ptr)(span, { .ty = ty, .mut = mut, .nullable = nullable }));
+        } break; 
         default:
             assert(false && "Not a valid token to start a type");
             break;
