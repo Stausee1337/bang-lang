@@ -119,6 +119,7 @@ typedef struct {
 
 // TODO: maybe add dynamic array
 // TODO: missing anonymous struct, enums, ...
+// TODO: add union-fallables `Success!Error`
 // TODO: add duck-typing match delcartions
 #define ENUMERATE_TYPE_NODES                \
     _NODE(TyPath, { Ast_Path path; })       \
@@ -145,6 +146,9 @@ typedef struct {
         size_t size;                        \
     })                                      \
     _NODE(Inferred, { })                    \
+    _NODE(Nullable, {                       \
+        Ast_Type *ty;                       \
+    })                                      \
 
 typedef enum {
 #define _NODE(name, ...) name##_kind,

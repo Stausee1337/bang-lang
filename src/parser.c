@@ -534,6 +534,16 @@ Ast_Type *parse_type(Parser *p) {
         ty = parse_generic(p, ty);
     }
 
+    if (p->token.kind == '?') {
+        Lex_Span span = {
+            .start = ty->span.start,
+            .end = p->token.span.end,
+            .filename = p->token.span.filename,
+        };
+        ty = New(create_type(Nullable)(span, { .ty = ty }));
+        next_token(p);
+    }
+
     return ty;
 }
 
