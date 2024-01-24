@@ -154,8 +154,9 @@ Ast_Path parse_path(Parser *p) {
 }
 
 Ast_Block *parse_block(Parser *p);
-Ast_Block *make_block(Ast_Expr *expr);
-Ast_Expr *make_block_expr(Ast_Block *block);
+Ast_Expr *make_block_expr(Ast_Block *block) {
+    return New(create_expr(Block)(block->span, { .block = block }));
+}
 
 static
 Ast_Expr *parse_if_expr(Parser *p) {
@@ -163,12 +164,7 @@ Ast_Expr *parse_if_expr(Parser *p) {
     next_token(p); // skip `if`
     
     Ast_Expr *cond = parse_expr_assoc(p, 0);
-    Ast_Block *body;
-    if (p->token.kind == '{') {
-        body = parse_block(p);
-    } else {
-        body = make_block(parse_expr_assoc(p, 0));
-    }
+    Ast_Block *body = parse_block(p);
 
     Lex_Span span = {
         .start = start,
@@ -183,11 +179,7 @@ Ast_Expr *parse_if_expr(Parser *p) {
         if (p->token.kind == Tk_Keyword && p->token.Tk_Keyword.keyword == K_If)  {
             else_branch = parse_if_expr(p);
         } else {
-            if (p->token.kind == '{') {
-                else_branch = make_block_expr(parse_block(p));
-            } else {
-                else_branch = make_block_expr(make_block(parse_expr_assoc(p, 0)));
-            }
+            else_branch = make_block_expr(parse_block(p));
         }
         if_expresssion->If.else_block = else_branch;
     }
@@ -638,18 +630,6 @@ Ast_Block *parse_block(Parser *p) {
         .filename = endspan.filename
     };
     return New(((Ast_Block) { .stmts = stmts, .span = span }));
-}
-
-
-Ast_Block *make_block(Ast_Expr* expr) {
-    Ast_Stmt *stmt = New(create_stmt(Expr)(expr->span, { .expr = expr, .semicolon = false }));
-    Ast_Stmts stmts = {0};
-    da_append(&stmts, stmt);
-    return New(((Ast_Block) { .stmts = stmts, .span = expr->span }));
-}
-
-Ast_Expr *make_block_expr(Ast_Block *block) {
-    return New(create_expr(Block)(block->span, { .block = block }));
 }
 
 Ast_Item *parse_directive_item(Parser *p) {
