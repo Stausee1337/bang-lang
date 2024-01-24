@@ -63,7 +63,11 @@ static
 Lex_Token _cursor_next(TokenCursor *c) {
     size_t next_idx = c->tree_cursor.item;
     if (next_idx >= c->tree_cursor.stream.count) {
-        assert(c->stack.count > 0 && "next_token(Parser*) after Tk_EOF is forbidden");
+        if (c->stack.count == 0) {
+            // return EOF  
+            Lex_TokenTree *tree = &c->tree_cursor.stream.items[c->tree_cursor.stream.count - 1];
+            return tree->Tt_Token;
+        }
         TreeTriple triple = c->stack.items[--c->stack.count];
         c->tree_cursor = triple.cursor;
         return (Lex_Token) {
@@ -94,7 +98,11 @@ Lex_Token _cursor_next(TokenCursor *c) {
             .span = delimited->span.open
         };
     } else {
-        return tree->Tt_Token;
+        Lex_Token token = tree->Tt_Token;
+        if (token.kind == Tk_LineComment || token.kind == Tk_BlockComment) {
+            return _cursor_next(c);
+        }
+        return token;
     }
 }
 
