@@ -113,13 +113,6 @@ void next_token(Parser *p) {
     p->token = _cursor_next(&p->cursor);
 }
 
-static
-Lex_Token* lookahead(Parser *p, size_t ll) {
-    _U(p);
-    _U(ll);
-    assert(false && "Not implemented");
-}
-
 bool is_eof(Parser *p) {
     return p->token.kind == Tk_EOF;
 }
@@ -619,6 +612,8 @@ Ast_Type *parse_type(Parser *p) {
 }
 
 Ast_Type *parse_generic(Parser *p, Ast_Type *base) {
+    _U(p);
+    _U(base);
     assert(false && "parsing of genric tys not implemented");
 }
 
