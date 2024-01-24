@@ -257,6 +257,7 @@ void ast_print_item(String_Builder *sb, Ast_Item *item, uint32_t level) {
 
     bswitch(item, {
         bind(RunBlock, (block) {
+            sb_append_cstr(sb, ", ");
             ast_print_block(sb, block, level + 1);
         });
         default: break;
