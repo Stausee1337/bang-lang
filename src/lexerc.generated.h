@@ -120,9 +120,9 @@ Keyword keyword_resolve(const char * in) {
 typedef enum {
     D_Invalid = -1,
     D_If,
-    D_Else,
     D_Include,
     D_Open,
+    D_Entrypoint,
     D_NumberOfElements
 } Directive;
 
@@ -135,9 +135,9 @@ LEXERC_H_PREFIX
 const char *directive_to_string(Directive in) {
     static const char *directive_str_map[NUM_ENTRIES_DIRECTIVE] = {
         "If",
-        "Else",
         "Include",
         "Open",
+        "Entrypoint",
     };
     assert(in < NUM_ENTRIES_DIRECTIVE);
 
@@ -151,16 +151,16 @@ Directive directive_resolve(const char * in);
 LEXERC_H_PREFIX
 Directive directive_resolve(const char * in) {
     static const struct _d_struct_tuple { const char * _0; Directive _1; } _d_entries[NUM_ENTRIES_DIRECTIVE] = {
-        { "else", D_Else },
+        { "entrypoint", D_Entrypoint },
+        { "if", D_If },
         { "include", D_Include },
         { "open", D_Open },
-        { "if", D_If },
     };
     
 #define NUM_D_DISPS 1
     static const uint32_t _d_disps[NUM_D_DISPS][2] = 
-        { { 0, 0 },  };
-    static const char* _d_hashkey = "\x00\x00\x00\x00\x00\x00\x00\x00t\xfe\x86\xe4Q\xec\x10\xc1";
+        { { 3, 0 },  };
+    static const char* _d_hashkey = "\x00\x00\x00\x00\x00\x00\x00\x00\xa1#AA4\xfc\x13\xe2";
 
     uint64_t hash = thirdparty_siphash24(in, strlen(in), _d_hashkey);
     const uint32_t lower = hash & 0xffffffff;

@@ -127,9 +127,9 @@ Lex_Token expect(Parser *p, Lex_TokenKind kind) {
 static
 Ast_Expr *parse_expr_assoc(Parser *p, int min_prec);
 
-Ast_Expr *parse_path(Parser *p) {
+Ast_Path parse_path(Parser *p) {
     Ast_Path path = {0};
-    Lex_Span span = (Lex_Span) {
+    Lex_Span span = {
         .start = p->token.span.start,
         .end = {0},
         .filename = p->token.span.filename
@@ -148,8 +148,9 @@ Ast_Expr *parse_path(Parser *p) {
         }
         next_token(p);
     }
+    path.span = span;
 
-    return New(create_expr(Path)(span, { .path = path }));
+    return path;
 }
 
 Ast_Block *parse_block(Parser *p);
@@ -262,8 +263,10 @@ Ast_Expr *parse_primary(Parser *p) {
             Ast_Block *block = parse_block(p);
             return New(create_expr(Block)(block->span, { .block = block }));
         } break;
-        case Tk_Ident:
-            return parse_path(p);
+        case Tk_Ident: {
+            Ast_Path path = parse_path(p);
+            return New(create_expr(Path)(path.span, { .path = path }));
+        } break;
         default: break;
     }
     assert(false && "SyntaxError: expected string, char, number, boolean, nil or identifier");
@@ -493,6 +496,94 @@ bool is_block_expr(Ast_ExprKind kind) {
     return kind == If_kind || kind == Block_kind;
 }
 
+Ast_Type *parse_type(Parser *p);
+Ast_Type *parse_generic(Parser *p, Ast_Type *base);
+
+Ast_Type *parse_type(Parser *p) {
+    Lex_Token token = p->token;
+    Ast_Type *ty = NULL;
+
+    switch ((int)token.kind) {
+        case '|': {
+            next_token(p);
+            Ast_Type *inner = parse_type(p);
+            Lex_Pos end = expect(p, '|').span.end;
+            Lex_Span span = {
+                .start = token.span.start,
+                .end = end,
+                .filename = token.span.filename
+            };
+            return New(create_type(Owned)(span, { .ty = inner }));
+        } break;
+        case Tk_Ident: {
+            Ast_Path path = parse_path(p);
+            ty = New(create_type(TyPath)(path.span, { .path = path }));
+        } break;
+        case '&':
+        case '*':
+        case '[':
+        case '(':
+            assert(false && "Type parsing of refs, ptrs, arrays, slices and tuples is not implemented yet");
+            break; 
+        default:
+            assert(false && "Not a valid token to start a type");
+            break;
+    }
+
+    if (p->token.kind == '(') {
+        ty = parse_generic(p, ty);
+    }
+
+    return ty;
+}
+
+Ast_Type *parse_generic(Parser *p, Ast_Type *base) {
+    assert(false && "parsing of genric tys not implemented");
+}
+
+Ast_Stmt *parse_decl_statement(Parser *p) {
+    assert(p->token.kind == Tk_Keyword && "Keyword Token is required");
+    Ast_Mutability mut;
+    switch (p->token.Tk_Keyword.keyword) {
+        case K_Const:
+            mut = M_Const;
+            break;
+        case K_Let:
+            mut = M_Mut;
+            break;
+        default:
+            assert(false && "Invalid parser; const or let token");
+            break;
+    }
+    next_token(p);
+    Lex_Span start = p->token.span;
+    String_Builder ident = expect(p, Tk_Ident).Tk_Ident.name;
+
+    Ast_Type *type = NULL;
+    if (p->token.kind != '=' && p->token.kind != ';') {
+        type = parse_type(p);
+    } else {
+        Lex_Span span = {
+            .filename = start.filename
+        };
+        type = New(create_type(Inferred)(span, {}));
+    }
+
+    Ast_Expr *init = NULL;
+    if (p->token.kind == '=') {
+        next_token(p);
+        init = parse_expr_assoc(p, 0);
+    }
+
+    Lex_Pos end = expect(p, ';').span.end;
+    Lex_Span span = {
+        .start = start.start,
+        .end = end,
+        .filename = start.filename
+    };
+    return New(create_stmt(Decl)(span, { .mut = mut, .ident = ident, .init = init, .type = type }));
+}
+
 Ast_Stmt *parse_stmt(Parser *p) {
     while (true) {
         // TODO: generate redundant semicolons warning
@@ -500,6 +591,15 @@ Ast_Stmt *parse_stmt(Parser *p) {
             break;
         }
         next_token(p);
+    }
+    if (p->token.kind == Tk_Keyword) {
+        switch (p->token.Tk_Keyword.keyword) {
+            case K_Const:
+            case K_Let: {
+                return parse_decl_statement(p);
+            } break;
+            default: break;
+        }
     }
     Ast_Expr *expr = parse_expr_assoc(p, 0);
     Lex_Pos end;
@@ -552,7 +652,49 @@ Ast_Expr *make_block_expr(Ast_Block *block) {
     return New(create_expr(Block)(block->span, { .block = block }));
 }
 
-Ast_Stmt *parser_parse(Lex_TokenStream stream) {
+Ast_Item *parse_directive_item(Parser *p) {
+    Lex_Token token = p->token;
+    switch (token.Tk_Directive.directive) {
+        case D_Entrypoint: {
+            next_token(p);
+            Ast_Block *block = parse_block(p);
+            Lex_Span span = {
+                .start = token.span.start,
+                .end = block->span.end,
+                .filename = token.span.filename
+            };
+            return New(create_item(RunBlock)(span, { .block = block }));
+        } break;
+        case D_Open:
+        case D_Include:
+        case D_If:
+            assert(false && "#open, #include and #if not implemented yet");
+            break;
+        default:
+            assert(false && "Unreachable");
+    }
+}
+
+Ast_Source parse_source(Parser *p) {
+    Ast_Source source = {0};
+    while (true) {
+        Lex_Token token = p->token;
+        if (token.kind == Tk_EOF) {
+            break;
+        }
+        switch ((int)token.kind) {
+            case Tk_Directive: {
+                Ast_Item *item = parse_directive_item(p);
+                da_append(&source, item);
+            } break;
+            default:
+                assert(false && "Unkown token at top-level of module");
+        }
+    }
+    return source;
+}
+
+Ast_Source parser_parse_source(Lex_TokenStream stream) {
     Parser p = {
         .token = {
             .kind = Tk_INIT,
@@ -564,6 +706,6 @@ Ast_Stmt *parser_parse(Lex_TokenStream stream) {
         }
     };
     next_token(&p);
-    return parse_stmt(&p);
+    return parse_source(&p);
 }
 

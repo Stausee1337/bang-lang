@@ -56,7 +56,7 @@ bool read_entire_file(const char *filename, String_Builder *sb) {
         return_defer(false);
     }
 
-    if (sb->capacity - sb->count < fsize) {
+    if (sb->capacity - sb->count < (size_t)fsize) {
         sb->items = realloc(sb->items, sb->count + fsize);
         sb->capacity = sb->count + fsize;
     }
@@ -129,9 +129,9 @@ int main(int argc, char **argv) {
     Lex_TokenStream stream = result.stream;
     // print_token_stream(stream, 0);
 
-    Ast_Stmt* stmt = parser_parse(stream);
+    Ast_Source source = parser_parse_source(stream);
     String_Builder sb = {0};
-    ast_print_stmt(&sb, stmt, 0);
+    ast_print_source(&sb, &source, 0);
 
     printf(SV_FMT"\n", SV_ARG(sb_to_string_view(&sb)));
 

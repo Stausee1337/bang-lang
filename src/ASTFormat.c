@@ -24,6 +24,17 @@ const char *stmt_to_string(Ast_StmtKind kind) {
     return stmt_names[kind];
 }
 
+static 
+const char *item_to_string(Ast_ItemKind kind) {
+#define _NODE(name, ...) #name,
+    static const char *item_names[] = {
+        ENUMERATE_ITEM_NODES
+    };
+#undef _NODE
+    assert(kind < Item_NumberOfElements);
+    return item_names[kind];
+}
+
 #define INDENT "    "
 void indent(String_Builder *sb, uint32_t level) {
     for (uint32_t i = 0; i < level; i++) {
@@ -205,6 +216,49 @@ void ast_print_stmt(String_Builder *sb, Ast_Stmt *stmt, uint32_t level) {
             sb_append_cstr(sb, "expr = ");
             ast_print_expr(sb, expr, level + 1);
         });
+        bind(Decl, (init, ident, mut, type) {
+            sb_append_cstr(sb, ", ident = ");
+            da_append_many(sb, ident.items, ident.count);
+
+            sb_append_cstr(sb, ", mut = ");
+            sb_append_cstr(sb, mut == M_Mut ? "Mut" : "Const");
+
+            sb_append_cstr(sb, ",\n");
+            indent(sb, level + 1);
+            sb_append_cstr(sb, "init = ");
+            if (init != NULL) {
+                ast_print_expr(sb, init, level + 1);
+            } else {
+                sb_append_cstr(sb, "NULL");
+            }
+
+            sb_append_cstr(sb, ",\n");
+            indent(sb, level + 1);
+            sb_append_cstr(sb, "type = ");
+            if (type->kind == Inferred_kind) {
+                sb_append_cstr(sb, "Inferred");
+            } else {
+                assert(false && "Pretty printing of real types is not implemted yet");
+                // ast_print_type(sb, type, level + 1);
+            }
+        });
+        default: break;
+    });
+
+    sb_append_cstr(sb, " }");
+}
+
+void ast_print_item(String_Builder *sb, Ast_Item *item, uint32_t level) {
+    sb_append_cstr(sb, item_to_string(item->kind));
+    sb_append_cstr(sb, " { ");
+
+    sb_append_cstr(sb, "span = ");
+    lexer_print_span(sb, item->span);
+
+    bswitch(item, {
+        bind(RunBlock, (block) {
+            ast_print_block(sb, block, level + 1);
+        });
         default: break;
     });
 
@@ -218,6 +272,19 @@ void ast_print_block(String_Builder *sb, Ast_Block *block, uint32_t level) {
         Ast_Stmt *stmt = block->stmts.items[i];
         indent(sb, level + 1);
         ast_print_stmt(sb, stmt, level + 1);
+        sb_append_cstr(sb, ",\n");
+    }
+    indent(sb, level);
+    sb_append_cstr(sb, "]");
+}
+
+void ast_print_source(String_Builder *sb, Ast_Source *source, uint32_t level) {
+    sb_append_cstr(sb, "Source [\n");
+
+    for (size_t i = 0; i < source->count; i++) {
+        Ast_Item *item = source->items[i];
+        indent(sb, level + 1);
+        ast_print_item(sb, item, level + 1);
         sb_append_cstr(sb, ",\n");
     }
     indent(sb, level);

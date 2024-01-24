@@ -44,10 +44,11 @@ enum Keyword {
 
 enum Directive {
     If;
-    Else;
 
     Include;
     Open;
+
+    Entrypoint;
 }
 
 enum NumberClass {
