@@ -72,29 +72,29 @@ def parse_punctuators(stream: TokenStream):
 
 {% customcode (_script.PrecedenceVariant, (_script.parse_token_arg, 'int'))|enum_parser.parse as penums %}
 enum BinaryOp {
-    Plus(+, 1);
-    Minus(-, 1);
-    Mul(*, 1);
-    Div(/, 1);
-    Mod(%, 1);
+    Mul(*, 11);
+    Div(/, 11);
+    Mod(%, 11);
 
-    BOr(||, 1);
-    BAnd(&&, 1);
-    BXor(^, 1);
+    Plus(+, 10);
+    Minus(-, 10);
 
-    Shl(<<, 1);
-    Shr(>>, 1);
+    Shl(<<, 9);
+    Shr(>>, 9);
 
-    Eq(==, 1);
-    Ne(!=, 1);
+    BAnd(&, 8);
+    BXor(^, 7);
+    BOr(|, 6);
 
-    Gt(>, 1);
-    Ge(>=, 1);
-    Lt(<, 1);
-    Le(<=, 1);
+    Eq(==, 5);
+    Ne(!=, 5);
+    Gt(>, 5);
+    Ge(>=, 5);
+    Lt(<, 5);
+    Le(<=, 5);
 
-    And(&, 1);
-    Or(|, 1);
+    And(&&, 4);
+    Or(||, 3);
 }
 {% endcode %}
 
@@ -124,7 +124,6 @@ enum UnaryOp {
     Not(!);
     Plus(+);
     Minus(-);
-    Address(&);
     Deref(*);
 }
 {% endcode %}
@@ -142,20 +141,24 @@ COMMA           ,
 DOT             .
 SEMICOLON       ;
 QUESTION        ?
+AMPERSAND       &
 
 DOUBLE_COLON    ::
 DOUBLE_DOT      ..
+DOUBLE_AND      &&
 ARROW           ->
 {% endcode %}
 
 {% for enum : penums %}
 {% expand define_enum enum %}
 {% expand define_precdences enum %}
+{% expand enum_to_string enum %}
 {% expand phf_hash_map enum 'resolve' 'uint32_t' %}
 {% endfor %}
 
 {% for enum : tenums %}
 {% expand define_enum enum %}
+{% expand enum_to_string enum %}
 {% expand phf_hash_map enum 'resolve' 'uint32_t' %}
 {% endfor %}
 

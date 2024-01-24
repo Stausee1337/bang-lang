@@ -123,7 +123,8 @@ char current(Lexer_State *ls) {
 
 static
 bool is_whitespace(Lexer_State *ls) {
-    return current(ls) == ' ';
+    char curr = current(ls);
+    return curr == ' ' || (curr >= '\x09' && curr <= '\x0d');
 }
 
 static
@@ -1125,7 +1126,7 @@ void lexer_print_delimited(String_Builder *sb, Lex_Delimited *token) {
     sb_append_cstr(sb, " }");
 }
 
-inline static
+static inline
 const char *tokenkind_to_string(Lex_TokenKind in) {
     static const char *lexer_token_names[] = {
         "EOF",
@@ -1154,7 +1155,10 @@ void lexer_print_token(String_Builder *sb, Lex_Token *token) {
     sb_append_cstr(sb, "Token { ");
     sb_append_cstr(sb, "type = ");
     Lex_TokenKind kind = token->kind;
-    if (kind < 0x80) {
+
+    if (kind == Tk_INIT) {
+        sb_append_cstr(sb, "Init");
+    } else if (kind < 0x80) {
         da_append(sb, (char)kind);
     } else if (kind <= 0xff) {
         sb_append_cstr(sb, tokenkind_to_string(kind));
@@ -1162,7 +1166,7 @@ void lexer_print_token(String_Builder *sb, Lex_Token *token) {
         da_append_many(sb, (char*)&kind, 2);
     } else if (kind <= 0xffffff) {
         da_append_many(sb, (char*)&kind, 3);
-    } else if (kind <= 0xffffffff) {
+    } else if (kind <= 0x7fffffff) {
         da_append_many(sb, (char*)&kind, 4);
     }
 

@@ -76,8 +76,9 @@ typedef enum {
 } Lex_Error;
 
 typedef enum {
-#define VARIANT(name, ...) Tk_##name,
+    Tk_INIT = -1,
     Tk_EOF = 0x80,
+#define VARIANT(name, ...) Tk_##name,
 ENUMERATE_LEXER_TOKENS
     Tk_NumberOfTokens
 #undef VARIANT
@@ -86,11 +87,16 @@ ENUMERATE_LEXER_TOKENS
 #define IS_FLOAT_CLASS(class) \
     (class) == Nc_f32 || (class) == Nc_f64 || (class) == Nc_FloatingPointNumber
 
+#define IS_TOKEN_KIND(kind) \
+    ((kind) == -1 || ((kind) >= 0x80 && (kind) <= 0xff))
+#define AS_PUNCTUATOR(kind) (char*)(&(kind))
+
 typedef struct {
     size_t col;
     size_t row;
 } Lex_Pos;
 
+// FIXME: Memory optimize span
 typedef struct {
     String_View filename;
     Lex_Pos start;
