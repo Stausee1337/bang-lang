@@ -133,7 +133,7 @@ typedef struct {
         Ast_Mutability mut;                 \
     })                                      \
     _NODE(Generic, {                        \
-        Ast_Type *ty;                       \
+        Ast_Type *base;                     \
         Ast_Tys arguments;                  \
     })                                      \
     _NODE(TyArray, {                        \
@@ -143,7 +143,6 @@ typedef struct {
     _NODE(TySlice, { Ast_Type *ty; })       \
     _NODE(TyTuple, {                        \
         Ast_Tys types;                      \
-        size_t size;                        \
     })                                      \
     _NODE(Inferred, { })                    \
     _NODE(Nullable, {                       \
@@ -284,5 +283,6 @@ void ast_print_item(String_Builder *sb, Ast_Item *item, uint32_t level);
 void ast_print_type(String_Builder *sb, Ast_Type *type, uint32_t level);
 void ast_print_block(String_Builder *sb, Ast_Block *block, uint32_t level);
 void ast_print_source(String_Builder *sb, Ast_Source *source, uint32_t level);
+void ast_print_path(String_Builder *sb, Ast_Path *path);
 
 #endif //AST_H_

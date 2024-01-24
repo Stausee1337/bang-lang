@@ -35,6 +35,17 @@ const char *item_to_string(Ast_ItemKind kind) {
     return item_names[kind];
 }
 
+static 
+const char *type_to_string(Ast_TypeKind kind) {
+#define _NODE(name, ...) #name,
+    static const char *type_names[] = {
+        ENUMERATE_TYPE_NODES
+    };
+#undef _NODE
+    assert(kind < Type_NumberOfElements);
+    return type_names[kind];
+}
+
 #define INDENT "    "
 void indent(String_Builder *sb, uint32_t level) {
     for (uint32_t i = 0; i < level; i++) {
@@ -86,13 +97,7 @@ void ast_print_expr(String_Builder *sb, Ast_Expr *expr, uint32_t level) {
         });
         bind(Path, (path) {
             sb_append_cstr(sb, ", path = ");
-            for (size_t i = 0; i < path.count; i++) {
-                Ast_PathSegment *segment = &path.items[i];
-                da_append_many(sb, segment->ident.items, segment->ident.count);
-                if (i < path.count - 1) {
-                    da_append(sb, ':');
-                }
-            }
+            ast_print_path(sb, &path);
         });
         bind(Unary, (op, expr) {
             sb_append_cstr(sb, ", op = UnaryOp::");
@@ -200,6 +205,16 @@ void ast_print_expr(String_Builder *sb, Ast_Expr *expr, uint32_t level) {
     sb_append_cstr(sb, " }");
 }
 
+void ast_print_path(String_Builder *sb, Ast_Path *path) {
+    for (size_t i = 0; i < path->count; i++) {
+        Ast_PathSegment *segment = &path->items[i];
+        da_append_many(sb, segment->ident.items, segment->ident.count);
+        if (i < path->count - 1) {
+            da_append(sb, ':');
+        }
+    }
+}
+
 void ast_print_stmt(String_Builder *sb, Ast_Stmt *stmt, uint32_t level) {
     sb_append_cstr(sb, stmt_to_string(stmt->kind));
     sb_append_cstr(sb, " { ");
@@ -235,17 +250,105 @@ void ast_print_stmt(String_Builder *sb, Ast_Stmt *stmt, uint32_t level) {
             sb_append_cstr(sb, ",\n");
             indent(sb, level + 1);
             sb_append_cstr(sb, "type = ");
-            if (type->kind == Inferred_kind) {
-                sb_append_cstr(sb, "Inferred");
-            } else {
-                assert(false && "Pretty printing of real types is not implemted yet");
-                // ast_print_type(sb, type, level + 1);
-            }
+            ast_print_type(sb, type, level + 1);
         });
         default: break;
     });
 
     sb_append_cstr(sb, " }");
+}
+
+void ast_print_type(String_Builder *sb, Ast_Type *type, uint32_t level) {
+    sb_append_cstr(sb, type_to_string(type->kind));
+
+    if (type->kind != Inferred_kind) {
+        sb_append_cstr(sb, " { ");
+        sb_append_cstr(sb, "span = ");
+        lexer_print_span(sb, type->span);
+    }
+
+#define PRINT_MUT_TY \
+do {                                                    \
+    sb_append_cstr(sb, ", mut = ");                     \
+    sb_append_cstr(sb, mut == M_Mut ? "Mut" : "Const"); \
+                                                        \
+    sb_append_cstr(sb, ",\n");                          \
+    indent(sb, level + 1);                              \
+    sb_append_cstr(sb, "ty = ");                        \
+    ast_print_type(sb, ty, level + 1);                  \
+} while(0);
+
+#define PRINT_TY \
+do {                                    \
+    sb_append_cstr(sb, ",\n");          \
+    indent(sb, level + 1);              \
+    sb_append_cstr(sb, "ty = ");        \
+    ast_print_type(sb, ty, level + 1);  \
+} while (0);
+
+    bswitch(type, {
+        bind(TyPath, (path) {
+            sb_append_cstr(sb, ", path = ");
+            ast_print_path(sb, &path);
+        });
+        bind(Owned, (ty) {
+            PRINT_TY
+        });
+        bind(Ref, (ty, mut) {
+            PRINT_MUT_TY
+        });
+        bind(Ptr, (ty, mut) {
+            PRINT_MUT_TY
+        });
+        bind(TyArray, (ty, size) {
+            sb_append_cstr(sb, ", size = ");
+            char buffer[50] = {0};
+            sprintf(buffer, "%zu", size);
+            sb_append_cstr(sb, buffer);
+
+            sb_append_cstr(sb, ",\n");
+            indent(sb, level + 1);
+            sb_append_cstr(sb, "ty = ");
+            ast_print_type(sb, ty, level + 1);
+        });
+        bind(TySlice, (ty) {
+            PRINT_TY
+        });
+        bind(TyTuple, (types) {
+            sb_append_cstr(sb, ", types = [\n");
+            for (size_t i = 0; i < types.count; i++) {
+                Ast_Type* type = types.items[i];
+                indent(sb, level + 1);
+                ast_print_type(sb, type, level + 1);
+                sb_append_cstr(sb, ",\n");
+            }
+            indent(sb, level);
+            sb_append_cstr(sb, "]");
+        });
+        bind(Generic, (base, arguments) {
+            sb_append_cstr(sb, ",\n");
+            indent(sb, level + 1);
+            sb_append_cstr(sb, "base = ");
+            ast_print_type(sb, base, level + 1);
+
+            sb_append_cstr(sb, ", arguments = [\n");
+            for (size_t i = 0; i < arguments.count; i++) {
+                Ast_Type* type = arguments.items[i];
+                indent(sb, level + 1);
+                ast_print_type(sb, type, level + 1);
+                sb_append_cstr(sb, ",\n");
+            }
+            indent(sb, level);
+            sb_append_cstr(sb, "]");
+        })
+        bind(Nullable, (ty) {
+            PRINT_TY
+        });
+        default: break;
+    });
+
+    if (type->kind != Inferred_kind)
+        sb_append_cstr(sb, " }");
 }
 
 void ast_print_item(String_Builder *sb, Ast_Item *item, uint32_t level) {
